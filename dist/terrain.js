@@ -7,5 +7,9 @@ export function height(x,z){
  const islet=1.3-Math.hypot((x+48)/5,(z-22)/6)*1.5;
  return Math.max(-3,main,bar,islet);
 }
-export function pointerInput(x,y){const turn=smooth(.48,.97,Math.abs(x));return{forward:-y,strafe:x*(1-turn),turn:Math.sign(x)*turn};}
+// One thumb: independent throttle and steering, never an implicit strafe/turn switch.
+export function pointerInput(x,y){
+ x=clamp(x,-1,1);y=clamp(y,-1,1);
+ return {forward:y===0?0:-Math.sign(y)*Math.pow(Math.abs(y),.8),strafe:0,turn:Math.sign(x)*Math.pow(Math.abs(x),1.35)};
+}
 export function walkable(x,z){return height(x,z)>.12;}

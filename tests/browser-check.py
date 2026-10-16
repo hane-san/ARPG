@@ -3,7 +3,7 @@ import atexit,argparse,json,math,subprocess,sys,time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1]
-parser=argparse.ArgumentParser();parser.add_argument('--url');parser.add_argument('--smoke',action='store_true');args=parser.parse_args()
+parser=argparse.ArgumentParser();parser.add_argument('--url');parser.add_argument('--smoke',action='store_true');parser.add_argument('--greeting-only',action='store_true');args=parser.parse_args()
 base=args.url or 'http://127.0.0.1:4173/'
 if not args.url:
  server=subprocess.Popen(['python3','-m','http.server','4173','--bind','127.0.0.1','--directory',str(root)],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
@@ -20,11 +20,18 @@ def stopped(page):
 audio_probe="""window._footBuffers=[];const AC=window.AudioContext||window.webkitAudioContext;const create=AC.prototype.createBuffer;AC.prototype.createBuffer=function(...args){const buffer=create.apply(this,args);if(buffer.duration<.3)window._footBuffers.push(buffer);return buffer;};"""
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
+ if args.greeting_only:
+  page=browser.new_page(viewport={'width':1440,'height':900});page.goto(base,wait_until='networkidle');page.wait_for_function('!!window.nagi');page.locator('#begin').click();page.keyboard.down('w');page.wait_for_function('nagi.greeted > 0',timeout=45000);page.keyboard.up('w')
+  assert page.locator('#speaker').inner_text()=='浜のひと'
+  assert 4.5<page.evaluate('nagi.greetingDistance')<=4.8;assert page.locator('#speaker').inner_text()=='浜のひと'
+  page.wait_for_timeout(1500);page.screenshot(path=str(root/'greeting.png'))
+  print('immediate run: first islander greets at',page.evaluate('nagi.greetingDistance'),'before passing by',flush=True)
+  browser.close();sys.exit(0)
  if args.smoke:
   context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
   live=context.new_page();live_errors=[];live.on('pageerror',lambda e:live_errors.append(str(e)))
   response=live.goto(base,wait_until='networkidle',timeout=45000);assert response.ok
-  live.wait_for_function('window.nagi && nagi.release === "2026-10-16-mobile-polish"',timeout=30000)
+  live.wait_for_function('window.nagi && nagi.release === "2026-10-16-one-thumb"',timeout=30000)
   icon=live.locator('link[rel="icon"]').get_attribute('href');assert live.request.get(live.evaluate('(p)=>new URL(p,location.href).href',icon)).ok
   live.locator('#begin').tap();live.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
   cdp=context.new_cdp_session(live);anchor=live.evaluate('nagi.position')
@@ -40,10 +47,13 @@ with sync_playwright() as p:
  errors=[]
  page.on('pageerror',lambda e:errors.append(str(e)))
  page.add_init_script(audio_probe)
+ page.add_init_script("const setMatrix=WebGLRenderingContext.prototype.uniformMatrix4fv;WebGLRenderingContext.prototype.uniformMatrix4fv=function(l,t,v){window._nagiVP=Array.from(v);return setMatrix.call(this,l,t,v);};")
  page.goto(base,wait_until='networkidle');page.wait_for_function('!!window.nagi',timeout=30000)
  assert page.evaluate('!!window.nagi'),errors
 
- assert page.evaluate('nagi.release')=='2026-10-16-mobile-polish'
+ assert page.evaluate('nagi.release')=='2026-10-16-one-thumb'
+ page.wait_for_function('!!window._nagiVP')
+ assert abs(page.evaluate('2*Math.atan(1/_nagiVP[5])*180/Math.PI')-68)<.001
  # Portrait, compact phones, tablet, and notched landscape: no overlap, clipping, or scrolling.
  for width,height,top,bottom,side in [(320,568,0,0,0),(320,568,44,34,0),(360,640,0,0,0),(390,844,44,34,0),(430,932,44,34,0),(768,1024,24,20,0),(667,375,0,21,44),(844,390,0,21,44)]:
   page.set_viewport_size({'width':width,'height':height})
@@ -66,7 +76,7 @@ with sync_playwright() as p:
  assert page.locator('#arrival').evaluate("e=>getComputedStyle(e).visibility")=='hidden'
  before=page.evaluate('nagi.position');initial_steps=page.evaluate('nagi.footsteps')
  page.keyboard.down('w');moved(page,before,3)
- assert page.evaluate('nagi.speed')>5.8
+ assert page.evaluate('nagi.speed')>7.2
  page.keyboard.up('w');page.wait_for_timeout(300)
  after=page.evaluate('nagi.position')
  assert after['z']<before['z']-2 and after['yaw']==before['yaw']
@@ -85,7 +95,7 @@ with sync_playwright() as p:
  assert len(stats)==6 and all(.01<s['peak']<1 and s['rms']>.005 for s in stats),stats
  assert page.evaluate('nagi.audioState')=='running'
  page.reload(wait_until='networkidle');page.locator('#begin').click();page.keyboard.down('w');page.wait_for_function('nagi.greeted > 0',timeout=90000);page.keyboard.up('w');page.wait_for_timeout(1500)
- page.screenshot(path=str(root/'greeting.png'));assert page.locator('#words').inner_text()
+ page.screenshot(path=str(root/'greeting.png'));assert page.locator('#words').inner_text();assert 4.5<page.evaluate('nagi.greetingDistance')<=4.8;assert page.locator('#speaker').inner_text()=='浜のひと'
  print('desktop: fast forward, backward without turning, origin-relative mouse, greetings, and non-clipping footstep PCM passed',flush=True)
  page.close()
  # Real CDP touch events exercise pointer capture and cancellation on a mobile viewport.
@@ -108,7 +118,7 @@ with sync_playwright() as p:
  assert distance(start,mobile.evaluate('nagi.position'))<.002
  # Lower-half contact is neutral; an upward slide runs without reaching the top half.
  touch('touchStart',195,705);mobile.wait_for_timeout(1200);stopped(mobile);touch('touchMove',195,620);moved(mobile,start,3)
- assert mobile.evaluate('nagi.speed')>5.8
+ assert mobile.evaluate('nagi.speed')>7.2
  assert mobile.evaluate('nagi.footsteps')>0 and mobile.evaluate('nagi.audioState')=='running'
  touch('touchEnd');stopped(mobile)
  forward=mobile.evaluate('nagi.position')
@@ -117,14 +127,23 @@ with sync_playwright() as p:
  touch('touchStart',190,600);touch('touchMove',190,700);moved(mobile,forward,1.6)
  assert mobile.evaluate('nagi.position.yaw')==forward['yaw']
  touch('touchCancel');assert not mobile.evaluate('nagi.dragging');stopped(mobile)
- # A small side stroke strafes; a large one turns in place without footsteps.
- side_start=mobile.evaluate('nagi.position');touch('touchStart',150,700);touch('touchMove',181,700);moved(mobile,side_start,.7)
- assert mobile.evaluate('nagi.position.yaw')==side_start['yaw']
- touch('touchEnd');stopped(mobile)
- turn_start=mobile.evaluate('nagi.position');steps=mobile.evaluate('nagi.footsteps');touch('touchStart',190,700);touch('touchMove',310,700)
- mobile.wait_for_function(f'nagi.position.yaw < {turn_start["yaw"]-.4}',timeout=30000)
+ # Every sideways stroke turns in place, including modest strokes; no strafe/turn mode switch.
+ turn_start=mobile.evaluate('nagi.position');steps=mobile.evaluate('nagi.footsteps');touch('touchStart',150,700);touch('touchMove',181,700)
+ mobile.wait_for_function(f'nagi.position.yaw < {turn_start["yaw"]-.18}',timeout=30000)
  assert distance(turn_start,mobile.evaluate('nagi.position'))<.002
  assert mobile.evaluate('nagi.footsteps')==steps
+ touch('touchEnd');stopped(mobile)
+ # One diagonal stroke runs and turns simultaneously at full forward speed.
+ curve_start=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',225,620);moved(mobile,curve_start,2)
+ curve_end=mobile.evaluate('nagi.position')
+ assert curve_end['yaw']<curve_start['yaw']-.06
+ assert mobile.evaluate('nagi.speed')>7.2
+ # Recenter while still holding: both throttle and rotation stop, without lifting the finger.
+ touch('touchMove',195,705);stopped(mobile);yaw=mobile.evaluate('nagi.position.yaw');mobile.wait_for_timeout(400);assert abs(mobile.evaluate('nagi.position.yaw')-yaw)<.0001
+ touch('touchEnd')
+ # Low deflection remains available for precise movement near an islander.
+ fine_start=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,688);moved(mobile,fine_start,.25)
+ assert .1<mobile.evaluate('nagi.speed')<3
  touch('touchEnd');stopped(mobile)
  edge_start=mobile.evaluate('nagi.position');touch('touchStart',340,720);stopped(mobile);touch('touchMove',378,720);mobile.wait_for_function(f'nagi.position.yaw < {edge_start["yaw"]-.4}',timeout=30000);touch('touchEnd');stopped(mobile)
 
@@ -143,10 +162,22 @@ with sync_playwright() as p:
  mobile.evaluate('dispatchEvent(new Event("pageshow"))')
  # A subsequent gesture recovers cleanly after cancellation/backgrounding.
  anchor=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,620);moved(mobile,anchor,.4);touch('touchEnd');stopped(mobile)
+ mobile.reload(wait_until='networkidle');mobile.wait_for_function('!!window.nagi');mobile.locator('#begin').tap();mobile.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
+ touch('touchStart',195,600);touch('touchMove',195,700)
+ blocked=False;previous=mobile.evaluate('nagi.position')
+ for _ in range(50):
+  mobile.wait_for_timeout(300);current=mobile.evaluate('nagi.position')
+  if distance(previous,current)<.002:blocked=True;break
+  previous=current
+ assert blocked,'shore boundary did not stop motion'
+ stopped(mobile);touch('touchEnd');stopped(mobile)
+ coast=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,620);moved(mobile,coast,.5);touch('touchEnd');stopped(mobile)
+ print('shore collision: held input stops at water, makes no footsteps, and can reverse cleanly',flush=True)
  assert not mobile.locator('#error').is_visible()
  mobile.screenshot(path=str(root/'touch-playing.png'))
  assert not errors,errors
+ print('one thumb: full-speed curved running, in-place turns at all strokes, recenter, fine movement, and edge origin passed',flush=True)
  print('long press, multi-touch/pinch, rotation, page background/return and input recovery passed',flush=True)
- print('mobile: lower-half origin, slide to run, backward, strafe/turn, release/cancel, and silent idle/turn passed',flush=True)
+ print('mobile: lower-half origin, slide to run, backward, steering, release/cancel, and silent idle/turn passed',flush=True)
  print('audio buffer peak/RMS:',json.dumps(stats),flush=True)
  browser.close()

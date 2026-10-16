@@ -79,10 +79,11 @@ islander(3.3,18.2,'浜のひと',['……ようこそ。潮が、あなたを連
 islander(20.5,5.3,'面を干すひと',['こんにちは。今日は、いい凪ですね。','あの花は、昨日まで青かったのですよ。'], 'b4a7bd');
 islander(-6,-15.5,'丘のひと',['おかえりなさい。……はじめまして、でしたか。','海の向こうにも、きっと、誰かの島がある。'], 'b6bba0');
 islander(-24,22,'潮待ちのひと',['道が見えるうちは、向こうまで歩けます。','あの小さな島は、夢のつづきなのだそうです。'], 'c4ada8');
-const player={x:8,z:30,y:height(8,30)+1.65,yaw:.25,vx:0,vz:0};
-let started=false,time=0,last=performance.now(),held=false,pointer={x:0,y:0},pointerOrigin=null,pointerId=null,activeTouches=new Set(),multiTouchBlocked=false,keys=new Set(),greetUntil=0,placeUntil=0,shownPlaces=new Set();
+const CAMERA_FOV=68,RUN_SPEED=7.8,GREETING_RADIUS=4.8;
+const player={x:8,z:30,y:height(8,30)+1.65,yaw:.25,yawRate:0,localForward:0,localSide:0,vx:0,vz:0};
+let started=false,time=0,last=performance.now(),held=false,pointer={x:0,y:0},pointerOrigin=null,pointerId=null,activeTouches=new Set(),multiTouchBlocked=false,keys=new Set(),greetUntil=0,placeUntil=0,shownPlaces=new Set(),lastGreetingDistance=null;
 function resize(){const d=Math.min(devicePixelRatio||1,1.7),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}addEventListener('resize',resize);resize();
-function vp(){const f=1/Math.tan(62*Math.PI/360),aspect=canvas.width/canvas.height,n=.08,far=520,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(player.yaw),s=Math.sin(player.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*player.x+s*player.z,-player.y,-s*player.x-c*player.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
+function vp(){const f=1/Math.tan(CAMERA_FOV*Math.PI/360),aspect=canvas.width/canvas.height,n=.08,far=520,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(player.yaw),s=Math.sin(player.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*player.x+s*player.z,-player.y,-s*player.x-c*player.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
 function draw(b,offset=[0,0,0],yaw=0,water=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);}
 function render(){gl.disable(gl.DEPTH_TEST);gl.useProgram(skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);const a=gl.getAttribLocation(skyProg,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);gl.uniform1f(gl.getUniformLocation(skyProg,'yaw'),player.yaw);gl.uniform1f(gl.getUniformLocation(skyProg,'aspect'),canvas.width/canvas.height);gl.drawArrays(gl.TRIANGLES,0,3);gl.enable(gl.DEPTH_TEST);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(prog);gl.uniformMatrix4fv(loc.uVP,false,vp());gl.uniform3f(loc.uEye,player.x,player.y,player.z);gl.uniform1f(loc.uTime,reduced?0:time);draw(distant);draw(sea,[0,0,0],0,1);draw(terrain);draw(foam);draw(world);draw(clouds);for(const npc of npcs){const target=Math.atan2(player.x-npc.x,player.z-npc.z);let diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));npc.angle+=diff*.018;draw(npc.mesh,[npc.x,npc.y+(reduced?0:Math.sin(time*.75+npc.x)*.013),npc.z],npc.angle);}}
 function occupied(x,z){if(!walkable(x,z))return true;return obstacles.some(([a,b,r])=>Math.hypot(x-a,z-b)<r+.23);}
@@ -92,20 +93,24 @@ function update(dt){
  forward+=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);
  strafe+=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
  turn+=(keys.has('ArrowRight')||keys.has('KeyE')?1:0)-(keys.has('ArrowLeft')||keys.has('KeyQ')?1:0);
- // A short thumb stroke already gives a lively run; the first few pixels allow fine control.
- forward=Math.sign(forward)*Math.pow(Math.min(1,Math.abs(forward)),.65);
+ // Steering is independent of throttle: a diagonal thumb stroke describes a curve, not a sideways slide.
  const len=Math.max(1,Math.hypot(forward,strafe));forward/=len;strafe/=len;
- player.yaw-=clamp(turn,-1,1)*dt*1.35;
- const boost=keys.has('ShiftLeft')||keys.has('ShiftRight')?1.16:1;
- const ahead=forward*(forward>=0?6.4:3.6)*boost,side=strafe*4.1*boost;
- const c=Math.cos(player.yaw),s=Math.sin(player.yaw),vx=side*c-ahead*s,vz=-ahead*c-side*s;
- const response=1-Math.exp(-dt*17);
- if(!forward&&!strafe){player.vx=player.vz=0;}else{player.vx+=(vx-player.vx)*response;player.vz+=(vz-player.vz)*response;}
+ const desiredYaw=clamp(turn,-1,1)*1.8;
+ if(!turn)player.yawRate=0;else player.yawRate+=(desiredYaw-player.yawRate)*(1-Math.exp(-dt*20));
+ player.yaw-=player.yawRate*dt;
+ const boost=keys.has('ShiftLeft')||keys.has('ShiftRight')?1.12:1;
+ const ahead=forward*(forward>=0?RUN_SPEED:5.4)*boost,side=strafe*5.8*boost;
+ const response=1-Math.exp(-dt*22);
+ if(!forward&&!strafe){player.localForward=player.localSide=0;}
+ else{player.localForward+=(ahead-player.localForward)*response;player.localSide+=(side-player.localSide)*response;}
+ // Velocity rotates with the camera immediately, so steering does not leave an old sideways drift.
+ const c=Math.cos(player.yaw),s=Math.sin(player.yaw);
+ player.vx=player.localSide*c-player.localForward*s;player.vz=-player.localForward*c-player.localSide*s;
  const oldX=player.x,oldZ=player.z,nx=player.x+player.vx*dt,nz=player.z+player.vz*dt;
  if(!occupied(nx,player.z))player.x=nx;if(!occupied(player.x,nz))player.z=nz;
  updateFootsteps(Math.hypot(player.x-oldX,player.z-oldZ),dt);
  const floor=height(player.x,player.z)+1.65;player.y+=(floor-player.y)*(1-Math.exp(-dt*10));
- for(const npc of npcs){const dist=Math.hypot(player.x-npc.x,player.z-npc.z);if(dist<3.5&&time-npc.last>23&&time>greetUntil+1){npc.last=time;document.querySelector('#speaker').textContent=npc.name;document.querySelector('#words').textContent=npc.lines[npc.index%npc.lines.length];npc.index++;document.querySelector('#greeting').style.opacity=1;greetUntil=time+7;chime();break;}}
+ for(const npc of npcs){const dist=Math.hypot(player.x-npc.x,player.z-npc.z);if(dist<GREETING_RADIUS&&time-npc.last>23&&time>greetUntil+1){lastGreetingDistance=dist;npc.last=time;document.querySelector('#speaker').textContent=npc.name;document.querySelector('#words').textContent=npc.lines[npc.index%npc.lines.length];npc.index++;document.querySelector('#greeting').style.opacity=1;greetUntil=time+7;chime();break;}}
  if(time>greetUntil)document.querySelector('#greeting').style.opacity=0;
  const places=[['浜の入口','THE LANDING',8,27,7],['オリーブの小径','OLIVE PATH',0,8,6],['潮見の鳥居','THE TIDE GATE',23,8,6],['名のない祠','THE HILL SHRINE',-4,-13,6],['潮待ちの砂州','THE TIDAL PATH',-31,22,8],['夢のつづき','THE OTHER SHORE',-48,22,5]];
  for(const [name,en,x,z,r] of places)if(!shownPlaces.has(name)&&Math.hypot(player.x-x,player.z-z)<r&&time>placeUntil+1){shownPlaces.add(name);document.querySelector('#place-jp').textContent=name;document.querySelector('#place-en').textContent=en;document.querySelector('#place').style.opacity=1;placeUntil=time+5;break;}
@@ -115,7 +120,7 @@ function frame(now){const dt=Math.min((now-last)/1000,.1);last=now;time+=dt;if(s
 function setPointer(e){
  if(!pointerOrigin)return;
  const r=canvas.getBoundingClientRect(),radius=clamp(Math.min(r.width,r.height)*.19,64,105);
- const axis=(d,available)=>{const travel=clamp(available,18,radius),dead=Math.min(7,travel*.16);return Math.sign(d)*clamp((Math.abs(d)-dead)/(travel-dead),0,1);};
+ const axis=(d,available)=>{const travel=clamp(available,18,radius),dead=Math.min(9,travel*.18);return Math.sign(d)*clamp((Math.abs(d)-dead)/(travel-dead),0,1);};
  const dx=e.clientX-pointerOrigin.x,dy=e.clientY-pointerOrigin.y;
  pointer.x=axis(dx,dx>=0?r.right-pointerOrigin.x-12:pointerOrigin.x-r.left-12);
  pointer.y=axis(dy,dy>=0?r.bottom-pointerOrigin.y-12:pointerOrigin.y-r.top-12);
@@ -137,7 +142,7 @@ canvas.addEventListener('pointermove',e=>{if(e.pointerId===pointerId){e.preventD
 function release(e){
  if(e&&e.pointerId!==pointerId)return;
  const previous=pointerId;held=false;pointerId=null;pointerOrigin=null;pointer.x=pointer.y=0;
- player.vx=player.vz=0;footDistance=0;feetMoving=false;
+ player.vx=player.vz=player.localForward=player.localSide=player.yawRate=0;footDistance=0;feetMoving=false;
  if(previous!==null&&canvas.hasPointerCapture(previous))canvas.releasePointerCapture(previous);
 }
 function finishPointer(e){if(e.pointerType==='touch'){activeTouches.delete(e.pointerId);if(!activeTouches.size)multiTouchBlocked=false;}release(e);}
@@ -191,7 +196,7 @@ function footstep(surface,speed){
  if(!audioCtx||audioCtx.state!=='running'||!footBuffers[surface])return;
  const source=audioCtx.createBufferSource(),gain=audioCtx.createGain();
  source.buffer=footBuffers[surface][footSide%2];source.playbackRate.value=.94+Math.random()*.12;
- gain.gain.value=.45+Math.min(speed/6.4,1)*.3;
+ gain.gain.value=.45+Math.min(speed/RUN_SPEED,1)*.3;
  source.connect(gain);
  let pan;
  if(audioCtx.createStereoPanner){pan=audioCtx.createStereoPanner();pan.pan.value=footSide%2?.1:-.1;gain.connect(pan);pan.connect(master);}else gain.connect(master);
@@ -200,13 +205,13 @@ function footstep(surface,speed){
 }
 function updateFootsteps(distance,dt){
  if(distance<.0008){footDistance=0;feetMoving=false;return;}
- const speed=distance/dt,stride=.72+Math.min(speed,7.5)*.22;
+ const speed=distance/dt,stride=.72+Math.min(speed,8.8)*.24;
  if(!feetMoving){footDistance=stride*.75;feetMoving=true;}
  footDistance+=distance;
  if(footDistance>=stride){footDistance%=stride;footstep(surfaceAt(player.x,player.z),speed);}
 }
 function chime(){if(!audioCtx||audioCtx.state!=='running')return;for(const [i,f] of [523.25,783.99].entries()){const o=audioCtx.createOscillator(),g=audioCtx.createGain(),t=audioCtx.currentTime+i*.15;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.035,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+2);o.connect(g);g.connect(master);o.start(t);o.stop(t+2);}}
-function begin(){if(started)return;started=true;greetUntil=time+2;placeUntil=time-2;document.body.classList.add('playing');canvas.focus();audio();document.querySelector('#hint').textContent='画面の下で、指を上へスライド。';document.querySelector('#hint').style.opacity=1;setTimeout(()=>document.querySelector('#hint').style.opacity=0,4500);}
+function begin(){if(started)return;started=true;greetUntil=time-1;placeUntil=time-2;document.body.classList.add('playing');canvas.focus();audio();document.querySelector('#hint').textContent='一本指で、上は前進・左右は旋回。';document.querySelector('#hint').style.opacity=1;setTimeout(()=>document.querySelector('#hint').style.opacity=0,4500);}
 const beginButton=document.querySelector('#begin');beginButton.addEventListener('click',begin);beginButton.disabled=false;beginButton.removeAttribute('aria-busy');
 // Minimal diagnostic state for development; no interface is added during play.
-window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return held},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+world.count+sea.count},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};
+window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+world.count+sea.count},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};

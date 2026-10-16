@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ja">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#c3ceca"><meta name="description" content="淡い海、奇妙な植物、面をつけた島民。何も急がなくていい、小さな島の一人称探索。"><title>凪の島 — NAGI</title><style>
+*{box-sizing:border-box}html,body{margin:0;width:100%;height:100%;overflow:hidden;background:#b8c9c8;color:#344a48;font-family:'Hiragino Mincho ProN','Yu Mincho',YuMincho,serif}body{touch-action:none}canvas{position:absolute;inset:0;width:100%;height:100%;display:block;outline:none;touch-action:none}.grain,.shade{position:fixed;inset:0;pointer-events:none}.grain{opacity:.055;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 180 180' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23000' filter='url(%23n)' opacity='.65' d='M0 0h180v180H0z'/%3E%3C/svg%3E")}.shade{background:radial-gradient(ellipse,transparent 42%,#5b686520 100%)}#arrival{position:absolute;inset:0;padding:42px 5.5%;background:linear-gradient(90deg,#e6e7da9e,transparent 70%);transition:opacity 1.8s,visibility 1.8s}.edition,.eyebrow,.notes,.folio,small{font-family:'Hiragino Kaku Gothic ProN','Noto Sans',sans-serif}.edition{font-size:9px;letter-spacing:.24em}.intro{position:absolute;top:28%;}.eyebrow{font-size:11px;letter-spacing:.23em}h1{font-weight:400;font-size:clamp(64px,8vw,112px);letter-spacing:.13em;margin:18px 0 25px;line-height:1.25}h1 span{display:block;font:10px/1.5 sans-serif;letter-spacing:.5em;margin:13px 0 0 7px}.intro p{font-size:13px;line-height:2.4;letter-spacing:.1em;margin-bottom:32px}button{border:1px solid #53675d65;border-radius:0;background:#e9ecdf80;padding:16px 23px;min-width:205px;color:inherit;font:13px serif;letter-spacing:.2em;cursor:pointer;transition:background .3s}button:hover,button:focus-visible{background:#f1f2e8;border-color:#53675d}button span{float:right;margin-left:35px;font-family:sans-serif}.notes{position:absolute;bottom:100px;right:5.5%;font-size:10px;line-height:2.1;color:#3c5351;background:#e6e9df70;padding:17px 22px}.notes>span{font:12px serif;letter-spacing:.2em}.notes p{margin:9px 0}.notes small{font-size:9px;opacity:.7}.folio{position:absolute;bottom:34px;left:5.5%;right:5.5%;border-top:1px solid #60716a50;padding-top:17px;font-size:10px;letter-spacing:.17em}.folio i{float:right;font-style:normal}.playing #arrival{opacity:0;visibility:hidden;pointer-events:none}.playing,.playing canvas{cursor:none}#place,#greeting,#hint{position:absolute;pointer-events:none;opacity:0;transition:opacity 1.4s;text-shadow:0 1px 10px #e7e9dc}#place{top:10%;left:0;right:0;text-align:center;color:#3e5752}#place span{font-size:20px;letter-spacing:.4em}#place small{display:block;font-size:8px;letter-spacing:.24em;margin-top:13px}#greeting{bottom:12%;left:5%;right:5%;text-align:center;color:#f7f5e9;filter:drop-shadow(0 1px 6px #253a3b);text-shadow:0 1px 3px #253a3b}#speaker{font-size:10px;letter-spacing:.25em}#words{font-size:clamp(14px,2vw,19px);line-height:2;letter-spacing:.1em;margin-top:12px;white-space:pre-line}#hint{bottom:7%;width:100%;text-align:center;font-size:12px;letter-spacing:.2em}#error{position:absolute;inset:35% 10%;padding:30px;background:#ecebdf;line-height:2}#error[hidden]{display:none}@media(max-width:650px){#arrival{padding-top:28px}.edition{font-size:7px}.intro{top:20%}h1{font-size:72px}.notes{bottom:82px;left:5.5%;right:auto;padding:10px 0;background:none;font-size:9px}.notes small{font-size:8px}.intro p{font-size:12px;margin-bottom:22px}.folio{bottom:25px;font-size:8px}#greeting{bottom:14%}}@media(prefers-reduced-motion:reduce){*{transition-duration:.1s!important}.grain{display:none}}
+
+</style></head>
+<body>
+<canvas id="world" tabindex="0" aria-label="凪の島。WASDで移動、左右矢印で旋回。マウスや指で画面を押し続けても移動できます。"></canvas>
+<div class="grain" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div>
+<section id="arrival" aria-label="島へ渡る">
+<div class="edition">A SMALL ISLAND, SOMEWHERE IN SETOUCHI</div>
+<div class="intro"><div class="eyebrow">ひとりで歩く、小さな異郷。</div><h1>凪の島<span>N A G I</span></h1><p>潮がひいて、道ができた。<br>まだ名前を知らない、あなたのために。</p><button id="begin">島へ渡る <span aria-hidden="true">⟶</span></button></div>
+<div class="notes"><span>歩きかた</span><p>W A S D で歩く · ← → で向きを変える<br>または画面を押し続ける。上で前へ、下で後ろへ。<br>左右はカニ歩き、端へ寄るほどゆっくり旋回。</p><small>上下の視点移動なし · 音が静かに流れます</small></div>
+<div class="folio">凪 ／ 小さな島の習作 <i>01</i></div>
+</section>
+<div id="place" aria-live="polite"><span id="place-jp"></span><small id="place-en"></small></div>
+<div id="greeting" role="status" aria-live="polite"><span id="speaker"></span><p id="words"></p></div>
+<div id="hint">ゆっくり、どうぞ。</div>
+<div id="error" role="alert" hidden>この島には WebGL が必要です。WebGL に対応したブラウザで開いてください。</div>
+<script type="module">
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+function height(x,z){
+ const a=Math.atan2(z/39,x/35),r=Math.hypot(x/35,z/39),edge=1+.07*Math.sin(3*a)+.055*Math.cos(5*a)-r;
+ const main=Math.min(1.45,edge*9)+smooth(0,.3,edge)*(5.2*Math.exp(-((x+12)**2/145+(z+16)**2/170))+2.8*Math.exp(-((x-15)**2/90+(z+15)**2/135)));
+ const bar=.34-((z-22)/3.2)**2*.5-Math.max(0,-x-47)*.4-Math.max(0,x+17)*.3;
+ const islet=1.3-Math.hypot((x+48)/5,(z-22)/6)*1.5;
+ return Math.max(-3,main,bar,islet);
+}
+function pointerInput(x,y){const turn=smooth(.48,.97,Math.abs(x));return{forward:-y,strafe:x*(1-turn),turn:Math.sign(x)*turn};}
+function walkable(x,z){return height(x,z)>.12;}
+
+const canvas=document.querySelector('#world'),gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
+if(!gl){document.querySelector('#error').hidden=false;document.querySelector('#begin').disabled=true;throw Error('WebGL unavailable');}
+const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const vs=`attribute vec3 aP,aN,aC;uniform mat4 uVP;uniform vec3 uOffset,uEye;uniform float uYaw,uTime,uWater;varying vec3 vC,vN,vP;varying float vD;void main(){float c=cos(uYaw),s=sin(uYaw);mat3 r=mat3(c,0.,-s,0.,1.,0.,s,0.,c);vec3 p=r*aP+uOffset;if(uWater>.5)p.y+=.055*sin(p.x*.35+uTime*.45)+.04*cos(p.z*.46-uTime*.38);vP=p;vN=r*aN;vC=aC;vD=length(p-uEye);gl_Position=uVP*vec4(p,1.);}`;
+const fs=`precision mediump float;varying vec3 vC,vN,vP;varying float vD;uniform float uTime,uWater;void main(){float light=.79+.21*abs(dot(normalize(vN),normalize(vec3(-.4,.85,.3))));vec3 col=vC*light;if(uWater>.5){float wave=sin(vP.x*.64+vP.z*.75+uTime*.5)*sin(vP.z*.43-uTime*.36);col+=smoothstep(.65,1.,wave)*.032;float gleam=pow(max(0.,sin(vP.x*.1+vP.z*.23)),28.)*.025;col+=gleam;}float fog=1.-exp(-vD*.008);fog=clamp(fog,0.,.97);col=mix(col,vec3(.77,.824,.815),fog);gl_FragColor=vec4(col,1.);}`;
+function shader(type,source){const sh=gl.createShader(type);gl.shaderSource(sh,source);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh;}
+function program(v,f){const p=gl.createProgram();gl.attachShader(p,shader(gl.VERTEX_SHADER,v));gl.attachShader(p,shader(gl.FRAGMENT_SHADER,f));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p;}
+const prog=program(vs,fs),loc={};for(const n of ['uVP','uOffset','uEye','uYaw','uTime','uWater'])loc[n]=gl.getUniformLocation(prog,n);
+const attrs=['aP','aN','aC'].map(n=>gl.getAttribLocation(prog,n));
+const skyProg=program(`attribute vec2 a;varying vec2 v;void main(){v=a*.5+.5;gl_Position=vec4(a,.9999,1.);}`,`precision mediump float;varying vec2 v;uniform float yaw,aspect;void main(){vec3 c=mix(vec3(.823,.837,.791),vec3(.663,.758,.785),smoothstep(.27,1.,v.y));float d=length((v-vec2(.69-sin(yaw)*.3,.70))*vec2(aspect,1.));c=mix(c,vec3(.94,.868,.733),.25*exp(-d*7.));c=mix(c,vec3(.947,.906,.802),1.-smoothstep(.034,.036,d));gl_FragColor=vec4(c,1.);}`);
+const skyBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
+let seed=12815;function random(){seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;}const rnd=(a,b)=>a+(b-a)*random();
+const hex=s=>{const n=parseInt(s.replace('#',''),16);return[n>>16&255,n>>8&255,n&255].map(x=>x/255)};
+const pal={sand:hex('ded0b8'),grass:hex('b0bea0'),stone:hex('a3ada5'),bark:hex('858d7c'),olive:hex('94a995'),purple:hex('b19bbf'),pink:hex('d2afb9'),cream:hex('e4dac1'),blue:hex('9fb7b6'),red:hex('bd8d82')};
+let data=[];function tri(a,b,c,color){const u=b.map((v,i)=>v-a[i]),v=c.map((v,i)=>v-a[i]);let n=[u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];const d=Math.hypot(...n)||1;n=n.map(x=>x/d);for(const p of [a,b,c])data.push(...p,...n,...color);}
+function quad(a,b,c,d,col){tri(a,b,c,col);tri(a,c,d,col);}
+function sphere(x,y,z,rx,ry,rz,col,seg=10,rings=6){for(let j=0;j<rings;j++)for(let i=0;i<seg;i++){function p(j,i){const a=j/rings*Math.PI,b=i/seg*2*Math.PI;return[x+Math.sin(a)*Math.cos(b)*rx,y+Math.cos(a)*ry,z+Math.sin(a)*Math.sin(b)*rz]}quad(p(j,i),p(j+1,i),p(j+1,i+1),p(j,i+1),col);}}
+function cone(x,y,z,r1,r2,h,col,seg=9){for(let i=0;i<seg;i++){const a=i/seg*Math.PI*2,b=(i+1)/seg*Math.PI*2;quad([x+Math.cos(a)*r1,y,z+Math.sin(a)*r1],[x+Math.cos(b)*r1,y,z+Math.sin(b)*r1],[x+Math.cos(b)*r2,y+h,z+Math.sin(b)*r2],[x+Math.cos(a)*r2,y+h,z+Math.sin(a)*r2],col);tri([x,y+h,z],[x+Math.cos(a)*r2,y+h,z+Math.sin(a)*r2],[x+Math.cos(b)*r2,y+h,z+Math.sin(b)*r2],col);}}
+function box(x,y,z,w,h,d,col){const a=[x-w/2,y,z-d/2],b=[x+w/2,y,z-d/2],c=[x+w/2,y,z+d/2],e=[x-w/2,y,z+d/2],f=a.map((v,i)=>i===1?v+h:v),g=b.map((v,i)=>i===1?v+h:v),k=c.map((v,i)=>i===1?v+h:v),l=e.map((v,i)=>i===1?v+h:v);quad(a,e,c,b,col);quad(f,g,k,l,col);quad(a,b,g,f,col);quad(b,c,k,g,col);quad(c,e,l,k,col);quad(e,a,f,l,col);}
+function branch(a,b,r,col){let axis=b.map((v,i)=>v-a[i]);const len=Math.hypot(...axis);axis=axis.map(x=>x/len);let u=Math.abs(axis[1])<.9?[0,1,0]:[1,0,0];u=[axis[1]*u[2]-axis[2]*u[1],axis[2]*u[0]-axis[0]*u[2],axis[0]*u[1]-axis[1]*u[0]];const n=Math.hypot(...u);u=u.map(x=>x/n);const v=[axis[1]*u[2]-axis[2]*u[1],axis[2]*u[0]-axis[0]*u[2],axis[0]*u[1]-axis[1]*u[0]];for(let i=0;i<6;i++){const pt=(p,i,r)=>p.map((p,j)=>p+r*(u[j]*Math.cos(i*Math.PI/3)+v[j]*Math.sin(i*Math.PI/3)));quad(pt(a,i,r),pt(a,i+1,r),pt(b,i+1,r*.65),pt(b,i,r*.65),col);}}
+function torus(x,y,z,r,t,col,vertical=false){for(let i=0;i<24;i++)for(let j=0;j<5;j++){function p(i,j){const a=i/24*Math.PI*2,b=j/5*Math.PI*2,rr=r+t*Math.cos(b);return vertical?[x+rr*Math.cos(a),y+rr*Math.sin(a),z+t*Math.sin(b)]:[x+rr*Math.cos(a),y+t*Math.sin(b),z+rr*Math.sin(a)]}quad(p(i,j),p(i+1,j),p(i+1,j+1),p(i,j+1),col);}}
+function batch(){const arr=new Float32Array(data);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);const b={buffer,count:data.length/9};data=[];return b;}
+const path=[[8,32],[5,22],[0,12],[-3,1],[-4,-11]];
+function distancePath(x,z,points=path){let d=Infinity;for(let i=1;i<points.length;i++){const [ax,az]=points[i-1],[bx,bz]=points[i],t=clamp(((x-ax)*(bx-ax)+(z-az)*(bz-az))/((bx-ax)**2+(bz-az)**2),0,1);d=Math.min(d,Math.hypot(x-ax-t*(bx-ax),z-az-t*(bz-az)));}return d;}
+function terrainColor(x,z){const h=height(x,z),p=Math.min(distancePath(x,z),distancePath(x,z,[[0,12],[12,12],[23,8]]));let col=h<.9?pal.sand:h>5?hex('aab4a3'):p<1.45?hex('d8ceb5'):pal.grass;const v=rnd(-.018,.018);return col.map(c=>clamp(c+v,0,1));}
+for(let z=-58;z<56;z+=1.5)for(let x=-60;x<52;x+=1.5){const a=[x,height(x,z),z],b=[x+1.5,height(x+1.5,z),z],c=[x+1.5,height(x+1.5,z+1.5),z+1.5],d=[x,height(x,z+1.5),z+1.5];tri(a,d,b,terrainColor(x+.5,z+.5));tri(b,d,c,terrainColor(x+1,z+1));}
+const terrain=batch();
+// Low islands soften the horizon around the miniature inland sea.
+for(let i=0;i<19;i++){const a=i/19*Math.PI*2,r=rnd(170,260);sphere(Math.cos(a)*r,-3,Math.sin(a)*r,rnd(15,38),rnd(7,15),rnd(12,28),hex(i%2?'aebfba':'b5c4be'),12,5);}
+const distant=batch();
+const obstacles=[];
+function rock(x,z,s){let y=height(x,z);sphere(x,y+s*.23,z,s,s*.55,s*.72,pal.stone,7,4);if(s>.7&&y>.3)obstacles.push([x,z,s*.6]);}
+for(let i=0;i<85;i++){let a=rnd(0,Math.PI*2),r=rnd(.82,1.07),x=Math.cos(a)*35*r,z=Math.sin(a)*39*r;if(height(x,z)>-.4)rock(x,z,rnd(.3,1.2));}
+// A few worn stepping stones lead inland.
+for(let i=0;i<22;i++){const t=i/21,j=Math.floor(t*(path.length-1)),u=t*(path.length-1)-j;const a=path[Math.min(j,path.length-2)],b=path[Math.min(j+1,path.length-1)],x=a[0]*(1-u)+b[0]*u+rnd(-.5,.5),z=a[1]*(1-u)+b[1]*u; sphere(x,height(x,z)+.025,z,.36,.065,.25,hex('bdbfb0'),7,3);}
+function olive(x,z,s=1){const y=height(x,z);branch([x,y,z],[x+.12*s,y+2.15*s,z],.12*s,pal.bark);for(let i=0;i<4;i++){const a=i*2.4,dx=Math.cos(a)*.7*s,dz=Math.sin(a)*.65*s;branch([x,y+1.1*s,z],[x+dx,y+2.5*s,z+dz],.06*s,pal.bark);sphere(x+dx,y+2.6*s,z+dz,.85*s,.5*s,.72*s,i%2?pal.olive:hex('a8b7a1'),9,5);}obstacles.push([x,z,.25*s]);}
+for(let i=0;i<64;i++){const x=rnd(-29,29),z=rnd(-30,27);if(height(x,z)<1.2||distancePath(x,z)<3||Math.hypot(x+4,z+12)<6||Math.hypot(x-23,z-8)<4)continue;olive(x,z,rnd(.8,1.25));}
+// Surreal plants: striped umbrella fungi and curled sea ferns.
+function mushroom(x,z,s,hue=0){const y=height(x,z),c=[pal.purple,pal.pink,pal.blue][hue];cone(x,y,z,.1*s,.15*s,1.65*s,pal.cream,8);sphere(x,y+1.65*s,z,.9*s,.37*s,.9*s,c,18,6);for(let j=0;j<3;j++)torus(x,y+(1.68+j*.09)*s,z,(.78-j*.19)*s,.025*s,j%2?pal.cream:pal.pink);for(let i=0;i<5;i++){const a=i*1.26;sphere(x+Math.cos(a)*.44*s,y+1.94*s,z+Math.sin(a)*.44*s,.07*s,.025*s,.07*s,pal.cream,5,3);}obstacles.push([x,z,.22*s]);}
+function fern(x,z,s){const y=height(x,z);for(let i=0;i<4;i++){const a=i*1.5,dx=Math.cos(a),dz=Math.sin(a);let p=[x,y,z];for(let j=1;j<=8;j++){const t=j/8,b=[x+dx*Math.sin(t*2.6)*.8*s,y+t*2.1*s,z+dz*Math.sin(t*2.6)*.8*s];branch(p,b,.035*s,j%2?pal.purple:pal.pink);if(j>2&&j<7)sphere(b[0]+dz*.18*s,b[1],b[2]-dx*.18*s,.21*s,.07*s,.11*s,j%2?pal.blue:pal.pink,6,3);p=b;}sphere(p[0],p[1],p[2],.13*s,.14*s,.13*s,pal.cream,7,4);}}
+for(const [x,z,s,c] of [[-4,24,1.25,0],[-6,23,.65,1],[-3,22,.7,2],[15,21,1.45,1],[17,19,.75,0],[19,22,.5,2],[-14,6,1.6,0],[-16,7,.9,2],[-13,8,.6,1],[9,-4,1.1,0],[10,-7,.65,1],[-24,-10,1.4,2],[-46,22,1.2,1]])mushroom(x,z,s,c);
+for(let i=0;i<34;i++){const x=rnd(-28,28),z=rnd(-29,30);if(height(x,z)>1&&distancePath(x,z)>2.4)fern(x,z,rnd(.45,.9));}
+// Tiny pastel grass, flowers, and salt-worn pebbles.
+for(let i=0;i<600;i++){const x=rnd(-34,34),z=rnd(-38,38),y=height(x,z);if(y<1||distancePath(x,z)<2)continue;const s=rnd(.12,.35),c=i%5===0?pal.pink:hex('a0b393');tri([x-.09,y,z],[x,y+s,z],[x+.09,y,z],c);tri([x,y,z-.09],[x,y+s,z],[x,y,z+.09],c);if(i%11===0)sphere(x,y+s,z,.07,.06,.07,pal.cream,5,3);}
+// Torii, with a subdued vermilion pigment washed by sea air.
+const tx=23,tz=8,ty=height(tx,tz);for(const x of [tx-1.55,tx+1.55]){cone(x,ty,tz,.17,.14,3.8,pal.red,9);box(x,ty-.02,tz,.6,.18,.6,pal.stone);}box(tx,ty+2.9,tz,3.8,.2,.22,pal.red);box(tx,ty+3.65,tz,4.6,.25,.43,pal.red);box(tx,ty+3.91,tz,4.9,.1,.54,hex('76877e'));box(tx,ty+3.1,tz,.3,.5,.14,pal.cream);obstacles.push([tx-1.55,tz,.35],[tx+1.55,tz,.35]);
+// An empty, open-sided hill shrine. The floor remains walkable.
+const sx=-4,sz=-13,sy=height(sx,sz);box(sx,sy-.2,sz,5.5,.25,4.5,pal.stone);box(sx,sy+.05,sz,4.6,.18,3.7,hex('b5aa94'));for(const x of [sx-2,sx+2])for(const z of [sz-1.5,sz+1.5]){box(x,sy+.2,z,.16,2.7,.16,pal.bark);obstacles.push([x,z,.25]);}box(sx,sy+2.8,sz,4.5,.18,3.8,pal.bark);
+for(const sign of [-1,1]){const a=[sx-2.9,sy+2.9,sz+sign*2.3],b=[sx+2.9,sy+2.9,sz+sign*2.3],c=[sx+2.9,sy+4,sz],d=[sx-2.9,sy+4,sz];quad(a,b,c,d,hex('889c98'));}box(sx,sy+4,sz,6,.13,.18,hex('7c8f8a'));cone(sx,sy+.2,sz,.48,.4,.6,pal.stone,8);
+// Shore lanterns and a weathered landing jetty.
+function lantern(x,z){const y=height(x,z);cone(x,y,z,.3,.18,.2,pal.stone);box(x,y+.2,z,.19,.7,.19,pal.stone);box(x,y+.9,z,.48,.45,.48,pal.cream);cone(x,y+1.35,z,.45,0,.3,pal.stone,4);obstacles.push([x,z,.27]);}
+for(const p of [[-6,-8],[-1,-8],[19,12],[26,12],[-29,22]])lantern(...p);
+for(let i=0;i<18;i++)box(7.5,.35,33+i*.5,2.1,.12,.43,hex(i%2?'a6a895':'b1b09c'));for(const z of [34,37,40])for(const x of [6.4,8.6]){cone(x,-1,z,.1,.08,2,pal.bark);}
+// An old mooring ring and a few ribbons at the far end of the sandbar.
+cone(-48,height(-48,22),22,.1,.08,2.8,pal.bark);for(let i=0;i<3;i++){const x=-48+i*.24,y=height(-48,22)+2.65;quad([x,y,22],[x+.15,y,22],[x+.22,y-.8,22.1],[x+.06,y-.92,22.1],[pal.pink,pal.purple,pal.cream][i]);}
+const world=batch();
+// Water is an actual surface: walking remains on dry land.
+for(let z=-350;z<350;z+=10)for(let x=-350;x<350;x+=10)quad([x,0,z],[x,0,z+10],[x+10,0,z+10],[x+10,0,z],hex('a5c2be'));
+const sea=batch();
+// Threadlike shoreline ripples. Their low contrast keeps the sea calm.
+for(let i=0;i<110;i++){const a=i/110*Math.PI*2,r=1.015,x=Math.cos(a)*35*r,z=Math.sin(a)*39*r;if(height(x,z)>.2)continue;const dx=-Math.sin(a)*rnd(.5,1.8),dz=Math.cos(a)*rnd(.5,1.8);quad([x-dx,.045,z-dz],[x-dx+.08,.045,z-dz+.08],[x+dx+.08,.045,z+dz+.08],[x+dx,.045,z+dz],hex('cedad0'));}
+const foam=batch();
+// Soft, low clouds hang over the distant islands.
+for(let i=0;i<13;i++){const a=i/13*Math.PI*2,r=rnd(120,190),x=Math.cos(a)*r,z=Math.sin(a)*r,y=rnd(24,36);for(let j=0;j<3;j++)sphere(x+j*8,y+j*.8,z,13,2.4,5,hex('d4dbd2'),9,5);}
+const clouds=batch();
+const npcs=[];
+function islander(x,z,name,lines,tint){
+ const cloth=hex(tint),ink=hex('677279');
+ cone(0,.04,0,.55,.23,1.27,cloth,8);box(0,.25,.29,.27,1.02,.025,pal.cream);box(0,.95,.02,.57,.12,.53,hex('acaa99'));
+ // Long sleeves, a narrow stole and a pale, expressionless Noh-inspired mask.
+ for(const s of [-1,1]){sphere(s*.39,1.06,0,.27,.4,.22,cloth,7,4);branch([s*.4,1.1,.05],[s*.45,.86,.26],.075,pal.cream);}cone(0,1.22,0,.12,.12,.25,pal.cream);sphere(0,1.57,-.02,.28,.37,.21,ink,10,7);sphere(0,1.56,.115,.245,.32,.115,hex('e8ddc5'),14,9);
+ for(const s of [-1,1]){sphere(s*.087,1.61,.222,.051,.014,.014,ink,7,4);sphere(s*.087,1.685,.205,.06,.009,.013,hex('92817c'),6,3);}sphere(0,1.535,.241,.027,.063,.025,pal.cream,7,5);sphere(0,1.445,.22,.04,.011,.012,hex('ab817f'),8,4);
+ for(let i=0;i<4;i++)box((i-1.5)*.095,1.82,-.025,.08,.14,.24,ink);
+ box(-.2,.02,.1,.19,.1,.37,ink);box(.2,.02,.1,.19,.1,.37,ink);
+ npcs.push({x,z,y:height(x,z),name,lines,mesh:batch(),last:-100,index:0,angle:0});obstacles.push([x,z,.65]);
+}
+islander(3.3,18.2,'浜のひと',['……ようこそ。潮が、あなたを連れてきた。','この島では、どこへ急ぐこともありません。'], 'a3b4b2');
+islander(20.5,5.3,'面を干すひと',['こんにちは。今日は、いい凪ですね。','あの花は、昨日まで青かったのですよ。'], 'b4a7bd');
+islander(-6,-15.5,'丘のひと',['おかえりなさい。……はじめまして、でしたか。','海の向こうにも、きっと、誰かの島がある。'], 'b6bba0');
+islander(-24,22,'潮待ちのひと',['道が見えるうちは、向こうまで歩けます。','あの小さな島は、夢のつづきなのだそうです。'], 'c4ada8');
+const player={x:8,z:30,y:height(8,30)+1.65,yaw:-.17,vx:0,vz:0};
+let started=false,time=0,last=performance.now(),held=false,pointer={x:0,y:0},pointerId=null,keys=new Set(),greetUntil=0,placeUntil=0,shownPlaces=new Set();
+function resize(){const d=Math.min(devicePixelRatio||1,1.7),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}addEventListener('resize',resize);resize();
+function vp(){const f=1/Math.tan(62*Math.PI/360),aspect=canvas.width/canvas.height,n=.08,far=520,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(player.yaw),s=Math.sin(player.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*player.x+s*player.z,-player.y,-s*player.x-c*player.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
+function draw(b,offset=[0,0,0],yaw=0,water=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);}
+function render(){gl.disable(gl.DEPTH_TEST);gl.useProgram(skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);const a=gl.getAttribLocation(skyProg,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);gl.uniform1f(gl.getUniformLocation(skyProg,'yaw'),player.yaw);gl.uniform1f(gl.getUniformLocation(skyProg,'aspect'),canvas.width/canvas.height);gl.drawArrays(gl.TRIANGLES,0,3);gl.enable(gl.DEPTH_TEST);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(prog);gl.uniformMatrix4fv(loc.uVP,false,vp());gl.uniform3f(loc.uEye,player.x,player.y,player.z);gl.uniform1f(loc.uTime,reduced?0:time);draw(distant);draw(sea,[0,0,0],0,1);draw(terrain);draw(foam);draw(world);draw(clouds);for(const npc of npcs){const target=Math.atan2(player.x-npc.x,player.z-npc.z);let diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));npc.angle+=diff*.018;draw(npc.mesh,[npc.x,npc.y+(reduced?0:Math.sin(time*.75+npc.x)*.013),npc.z],npc.angle);}}
+function occupied(x,z){if(!walkable(x,z))return true;return obstacles.some(([a,b,r])=>Math.hypot(x-a,z-b)<r+.23);}
+function update(dt){let forward=0,strafe=0,turn=0;if(held){const i=pointerInput(pointer.x,pointer.y);forward=i.forward;strafe=i.strafe;turn=i.turn;}forward+=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);strafe+=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);turn+=(keys.has('ArrowRight')||keys.has('KeyE')?1:0)-(keys.has('ArrowLeft')||keys.has('KeyQ')?1:0);player.yaw-=clamp(turn,-1,1)*dt*.95;const len=Math.max(1,Math.hypot(forward,strafe));forward/=len;strafe/=len;const speed=keys.has('ShiftLeft')||keys.has('ShiftRight')?4.4:2.65,c=Math.cos(player.yaw),s=Math.sin(player.yaw),vx=(strafe*c-forward*s)*speed,vz=(-forward*c-strafe*s)*speed;const t=1-Math.exp(-dt*9);player.vx+=(vx-player.vx)*t;player.vz+=(vz-player.vz)*t;const nx=player.x+player.vx*dt,nz=player.z+player.vz*dt;if(!occupied(nx,player.z))player.x=nx;if(!occupied(player.x,nz))player.z=nz;const floor=height(player.x,player.z)+1.65;player.y+=(floor-player.y)*(1-Math.exp(-dt*10));
+ for(const npc of npcs){const dist=Math.hypot(player.x-npc.x,player.z-npc.z);if(dist<3.5&&time-npc.last>23&&time>greetUntil+1){npc.last=time;document.querySelector('#speaker').textContent=npc.name;document.querySelector('#words').textContent=npc.lines[npc.index%npc.lines.length];npc.index++;document.querySelector('#greeting').style.opacity=1;greetUntil=time+7;chime();break;}}
+ if(time>greetUntil)document.querySelector('#greeting').style.opacity=0;
+ const places=[['浜の入口','THE LANDING',8,27,7],['オリーブの小径','OLIVE PATH',0,8,6],['潮見の鳥居','THE TIDE GATE',23,8,6],['名のない祠','THE HILL SHRINE',-4,-13,6],['潮待ちの砂州','THE TIDAL PATH',-31,22,8],['夢のつづき','THE OTHER SHORE',-48,22,5]];
+ for(const [name,en,x,z,r] of places)if(!shownPlaces.has(name)&&Math.hypot(player.x-x,player.z-z)<r&&time>placeUntil+1){shownPlaces.add(name);document.querySelector('#place-jp').textContent=name;document.querySelector('#place-en').textContent=en;document.querySelector('#place').style.opacity=1;placeUntil=time+5;break;}
+ if(time>placeUntil)document.querySelector('#place').style.opacity=0;
+}
+function frame(now){const dt=Math.min((now-last)/1000,.045);last=now;time+=dt;if(started)update(dt);render();requestAnimationFrame(frame);}requestAnimationFrame(frame);
+function setPointer(e){const r=canvas.getBoundingClientRect();pointer.x=clamp((e.clientX-r.left)/r.width*2-1,-1,1);pointer.y=clamp((e.clientY-r.top)/r.height*2-1,-1,1);pointer.x=Math.abs(pointer.x)<.08?0:pointer.x;pointer.y=Math.abs(pointer.y)<.08?0:pointer.y;}
+canvas.addEventListener('pointerdown',e=>{if(!started||e.button>0||pointerId!==null)return;held=true;pointerId=e.pointerId;setPointer(e);canvas.setPointerCapture(e.pointerId);canvas.focus();});canvas.addEventListener('pointermove',e=>{if(e.pointerId===pointerId)setPointer(e);});function release(e){if(!e||e.pointerId===pointerId){held=false;pointerId=null;}}canvas.addEventListener('pointerup',release);canvas.addEventListener('pointercancel',release);canvas.addEventListener('lostpointercapture',release);canvas.addEventListener('contextmenu',e=>e.preventDefault());
+const gameKeys=['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'];addEventListener('keydown',e=>{if(!started&&e.code==='Enter'){begin();return;}if(started&&gameKeys.includes(e.code)){e.preventDefault();keys.add(e.code);}if(e.code==='Escape')resetInput();});addEventListener('keyup',e=>keys.delete(e.code));function resetInput(){keys.clear();release();player.vx=player.vz=0;}addEventListener('blur',resetInput);document.addEventListener('visibilitychange',()=>{if(document.hidden){resetInput();if(audioCtx)audioCtx.suspend();}else if(audioCtx&&started)audioCtx.resume().catch(()=>{});});
+let audioCtx,master;function audio(){try{audioCtx=new(window.AudioContext||window.webkitAudioContext)();master=audioCtx.createGain();master.gain.value=.18;master.connect(audioCtx.destination);const buffer=audioCtx.createBuffer(1,audioCtx.sampleRate*4,audioCtx.sampleRate),v=buffer.getChannelData(0);let b=0;for(let i=0;i<v.length;i++){b=(b+(Math.random()*2-1)*.018)/1.018;v[i]=b*3;}const noise=audioCtx.createBufferSource();noise.buffer=buffer;noise.loop=true;const filter=audioCtx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=650;const gain=audioCtx.createGain();gain.gain.value=.4;noise.connect(filter);filter.connect(gain);gain.connect(master);noise.start();const lfo=audioCtx.createOscillator(),lg=audioCtx.createGain();lfo.frequency.value=.09;lg.gain.value=.15;lfo.connect(lg);lg.connect(gain.gain);lfo.start();audioCtx.resume().catch(()=>{});}catch{}}
+function chime(){if(!audioCtx||audioCtx.state!=='running')return;for(const [i,f] of [523.25,783.99].entries()){const o=audioCtx.createOscillator(),g=audioCtx.createGain(),t=audioCtx.currentTime+i*.15;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.035,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+2);o.connect(g);g.connect(master);o.start(t);o.stop(t+2);}}
+function begin(){if(started)return;started=true;greetUntil=time+2;placeUntil=time-2;document.body.classList.add('playing');canvas.focus();audio();document.querySelector('#hint').style.opacity=1;setTimeout(()=>document.querySelector('#hint').style.opacity=0,4500);}
+document.querySelector('#begin').addEventListener('click',begin);
+// Minimal diagnostic state for development; no interface is added during play.
+window.nagi={get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get started(){return started},get worldVertices(){return terrain.count+world.count+sea.count},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};
+
+</script>
+</body></html>

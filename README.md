@@ -39,3 +39,11 @@ npm run check
 ```
 
 現段階は島を歩く基本セットです。戦闘、クエスト、セーブ機能はまだありません。
+
+## GitHub Pages / iPhone で遊ぶ
+
+- 公開URL: https://hane-san.github.io/Koitototsukuru/ （起動時に `dist/index.html` へ移動）
+- iPhone の Safari で共有 → ホーム画面に追加を選ぶと、能面アイコン「凪の島」として保存できます。アイコンは `assets/nagi-icon-120.png`。
+- `manifest.webmanifest` に起動URLとアイコンを登録済みです。
+- Service Worker による固定キャッシュは作らず、毎回の起動で CSS とゲーム JS（地形 JS 含む）のURLに変化をつけ、以前の版を使い続けないようにしています。公開CDNの配信反映には数分かかる場合があります。すでに開いている画面は閉じて再度開いてください。
+- GitHub Pages が `main / (root)` に設定されていれば、main の更新は自動公開されます。Codexなどの作業ブランチだけを編集しても公開されず、mainへのPRマージが必要です。

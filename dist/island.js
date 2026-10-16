@@ -1,4 +1,4 @@
-import {height,walkable,clamp,smooth,pointerInput} from './terrain.js';
+const {height,walkable,clamp,smooth,pointerInput} = await import('./terrain.js?reload=' + Date.now());
 const canvas=document.querySelector('#world'),gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
 if(!gl){document.querySelector('#error').hidden=false;document.querySelector('#begin').disabled=true;throw Error('WebGL unavailable');}
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;

@@ -1,6 +1,19 @@
 <!doctype html>
 <html lang="ja">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#c3ceca"><meta name="description" content="淡い海、奇妙な植物、面をつけた島民。何も急がなくていい、小さな島の一人称探索。"><title>凪の島 — NAGI</title><link rel="stylesheet" href="style.css"></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#c3ceca"><meta name="description" content="淡い海、奇妙な植物、面をつけた島民。何も急がなくていい、小さな島の一人称探索。"><title>凪の島 — NAGI</title>
+<link rel="manifest" href="../manifest.webmanifest">
+<link rel="icon" type="image/png" href="../assets/nagi-icon-120.png">
+<link rel="apple-touch-icon" sizes="120x120" href="../assets/nagi-icon-120.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="凪の島">
+<script>
+  // ゲームを開き直すたびに最新版のスタイルシートを取得。
+  const css = document.createElement('link');
+  css.rel = 'stylesheet';
+  css.href = './style.css?reload=' + Date.now();
+  document.head.append(css);
+</script></head>
 <body>
 <canvas id="world" tabindex="0" aria-label="凪の島。WASDで移動、左右矢印で旋回。マウスや指で画面を押し続けても移動できます。"></canvas>
 <div class="grain" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div>
@@ -14,5 +27,8 @@
 <div id="greeting" role="status" aria-live="polite"><span id="speaker"></span><p id="words"></p></div>
 <div id="hint">ゆっくり、どうぞ。</div>
 <div id="error" role="alert" hidden>この島には WebGL が必要です。WebGL に対応したブラウザで開いてください。</div>
-<script type="module" src="island.js"></script>
+<script type="module">
+  // リロードなしで継続利用したキャッシュを、次の起動時に引きずらない。
+  import('./island.js?reload=' + Date.now());
+</script>
 </body></html>

@@ -31,7 +31,7 @@ with sync_playwright() as p:
   context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
   live=context.new_page();live_errors=[];live.on('pageerror',lambda e:live_errors.append(str(e)))
   response=live.goto(base,wait_until='networkidle',timeout=45000);assert response.ok
-  live.wait_for_function('window.nagi && nagi.release === "2026-10-16-one-thumb"',timeout=30000)
+  live.wait_for_function('window.nagi && nagi.release === "2026-10-16-northern-trails"',timeout=30000)
   icon=live.locator('link[rel="icon"]').get_attribute('href');assert live.request.get(live.evaluate('(p)=>new URL(p,location.href).href',icon)).ok
   live.locator('#begin').tap();live.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
   cdp=context.new_cdp_session(live);anchor=live.evaluate('nagi.position')
@@ -51,7 +51,7 @@ with sync_playwright() as p:
  page.goto(base,wait_until='networkidle');page.wait_for_function('!!window.nagi',timeout=30000)
  assert page.evaluate('!!window.nagi'),errors
 
- assert page.evaluate('nagi.release')=='2026-10-16-one-thumb'
+ assert page.evaluate('nagi.release')=='2026-10-16-northern-trails'
  page.wait_for_function('!!window._nagiVP')
  assert abs(page.evaluate('2*Math.atan(1/_nagiVP[5])*180/Math.PI')-68)<.001
  # Portrait, compact phones, tablet, and notched landscape: no overlap, clipping, or scrolling.
@@ -123,6 +123,10 @@ with sync_playwright() as p:
  touch('touchEnd');stopped(mobile)
  forward=mobile.evaluate('nagi.position')
  assert forward['z']<start['z']-2 and forward['yaw']==start['yaw']
+ # A slightly imperfect upward stroke still runs straight rather than slowly veering.
+ straight=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',207,620);moved(mobile,straight,.5)
+ assert abs(mobile.evaluate('nagi.position.yaw')-straight['yaw'])<.00001
+ touch('touchEnd');stopped(mobile);forward=mobile.evaluate('nagi.position')
  # Downward drag backs up without changing facing; cancel also stops immediately.
  touch('touchStart',190,600);touch('touchMove',190,700);moved(mobile,forward,1.6)
  assert mobile.evaluate('nagi.position.yaw')==forward['yaw']
@@ -141,6 +145,12 @@ with sync_playwright() as p:
  # Recenter while still holding: both throttle and rotation stop, without lifting the finger.
  touch('touchMove',195,705);stopped(mobile);yaw=mobile.evaluate('nagi.position.yaw');mobile.wait_for_timeout(400);assert abs(mobile.evaluate('nagi.position.yaw')-yaw)<.0001
  touch('touchEnd')
+ # A long swipe's origin follows overshoot: a short return can stop a sustained turn.
+ long_turn=mobile.evaluate('nagi.position');touch('touchStart',150,700);touch('touchMove',340,700)
+ mobile.wait_for_function(f'nagi.position.yaw < {long_turn["yaw"]-.18}',timeout=30000)
+ touch('touchMove',250,700);yaw=mobile.evaluate('nagi.position.yaw');mobile.wait_for_timeout(400)
+ assert abs(mobile.evaluate('nagi.position.yaw')-yaw)<.0001
+ touch('touchEnd');stopped(mobile)
  # Low deflection remains available for precise movement near an islander.
  fine_start=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,688);moved(mobile,fine_start,.25)
  assert .1<mobile.evaluate('nagi.speed')<3
@@ -176,7 +186,7 @@ with sync_playwright() as p:
  assert not mobile.locator('#error').is_visible()
  mobile.screenshot(path=str(root/'touch-playing.png'))
  assert not errors,errors
- print('one thumb: full-speed curved running, in-place turns at all strokes, recenter, fine movement, and edge origin passed',flush=True)
+ print('one thumb: straight-run forgiveness, overshoot return, full-speed curves, in-place turns, fine movement and edge origin passed',flush=True)
  print('long press, multi-touch/pinch, rotation, page background/return and input recovery passed',flush=True)
  print('mobile: lower-half origin, slide to run, backward, steering, release/cancel, and silent idle/turn passed',flush=True)
  print('audio buffer peak/RMS:',json.dumps(stats),flush=True)

@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="ja">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#c3ceca"><meta name="description" content="淡い海、奇妙な植物、面をつけた島民。何も急がなくていい、小さな島の一人称探索。"><meta name="nagi-release" content="2026-10-16-one-thumb"><title>凪の島 — NAGI</title>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#c3ceca"><meta name="description" content="淡い海、奇妙な植物、面をつけた島民。何も急がなくていい、小さな島の一人称探索。"><meta name="nagi-release" content="2026-10-16-northern-trails"><title>凪の島 — NAGI</title>
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="icon" type="image/png" href="./assets/nagi-icon-120.png">
 <link rel="apple-touch-icon" sizes="120x120" href="./assets/nagi-icon-120.png">
@@ -60,12 +60,21 @@ body{position:fixed;inset:0}canvas,.grain,.shade{position:fixed}body *{-webkit-u
 <script type="module">
 const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
 const smooth=(a,b,x)=>{const t=clamp((x-a)/(b-a),0,1);return t*t*(3-2*t)};
+// A continuous loop connects the old shrine to four different northern landscapes.
+const routes=[[[8,32],[5,22],[0,12],[-3,1],[-4,-11]],[[0,12],[14,14],[23,14],[23,8]],[[-3,1],[-9,-6],[-10,-18],[-10,-27],[-10,-34],[-23,-44],[-36,-57],[-36,-70],[-18,-81],[0,-85],[6,-100],[12,-91],[20,-83],[36,-65],[19,-57],[8,-40],[-10,-34]],[[19,-57],[29,-55]]];
+const landmarks=[['浜の入口','THE LANDING',8,27,7],['オリーブの小径','OLIVE PATH',0,8,6],['潮見の鳥居','THE TIDE GATE',23,8,6],['名のない祠','THE HILL SHRINE',-4,-13,6],['潮待ちの砂州','THE TIDAL PATH',-31,22,8],['夢のつづき','THE OTHER SHORE',-48,22,5],['薄紫の傘の森','THE UMBRELLA GROVE',-36,-57,9],['風を待つ段々畑','THE OLIVE TERRACES',36,-65,8],['硝子の入江','THE GLASS COVE',29,-55,6],['空に近い岬','THE QUIET HEADLAND',6,-100,7],['花の尾根道','THE FLOWER RIDGE',-18,-81,7]];
+function distanceToRoute(x,z,paths=routes){let d=Infinity;for(const points of paths)for(let i=1;i<points.length;i++){const [ax,az]=points[i-1],[bx,bz]=points[i],t=clamp(((x-ax)*(bx-ax)+(z-az)*(bz-az))/((bx-ax)**2+(bz-az)**2),0,1);d=Math.min(d,Math.hypot(x-ax-t*(bx-ax),z-az-t*(bz-az)));}return d;}
 function height(x,z){
  const a=Math.atan2(z/39,x/35),r=Math.hypot(x/35,z/39),edge=1+.07*Math.sin(3*a)+.055*Math.cos(5*a)-r;
  const main=Math.min(1.45,edge*9)+smooth(0,.3,edge)*(5.2*Math.exp(-((x+12)**2/145+(z+16)**2/170))+2.8*Math.exp(-((x-15)**2/90+(z+15)**2/135)));
  const bar=.34-((z-22)/3.2)**2*.5-Math.max(0,-x-47)*.4-Math.max(0,x+17)*.3;
  const islet=1.3-Math.hypot((x+48)/5,(z-22)/6)*1.5;
- return Math.max(-3,main,bar,islet);
+ const lobe=(cx,cz,rx,rz,level,rise)=>{const r=Math.hypot((x-cx)/rx,(z-cz)/rz),edge=1-r+.025*Math.sin(x*.16+z*.12);return Math.min(level,edge*9)+smooth(0,.38,edge)*rise*Math.exp(-r*r*3);};
+ let north=Math.max(lobe(-3,-43,22,27,1.9,1),lobe(-28,-61,29,28,2.1,4.5),lobe(27,-67,34,28,1.8,3),lobe(6,-94,20,25,2.7,5));
+ // An opening to the sea, rather than a closed pool: pale sand curves around its rim.
+ const cove=Math.hypot((x-47)/24,(z+44)/13);
+ north=Math.min(north,(cove-1)*6);
+ return Math.max(-3,main,bar,islet,north);
 }
 // One thumb: independent throttle and steering, never an implicit strafe/turn switch.
 function pointerInput(x,y){
@@ -73,6 +82,27 @@ function pointerInput(x,y){
  return {forward:y===0?0:-Math.sign(y)*Math.pow(Math.abs(y),.8),strafe:0,turn:Math.sign(x)*Math.pow(Math.abs(x),1.35)};
 }
 function walkable(x,z){return height(x,z)>.12;}
+// Identical travel at either side of the screen; a little more horizontal forgiveness while running.
+function dragInput(dx,dy,width,height){
+ const radius=clamp(Math.min(width,height)*.19,64,96);
+ const axis=(d,dead)=>Math.abs(d)<=dead?0:Math.sign(d)*clamp((Math.abs(d)-dead)/(radius-dead),0,1);
+ const y=axis(dy,9),x=axis(dx,9+4*Math.abs(y));
+ return {x,y};
+}
+// Resolve a full vector first, then slide along the contact tangent. No preferred world X/Z axis.
+function moveOnIsland(x,z,dx,dz,obstacles=[]){
+ const blocked=(a,b)=>!walkable(a,b)||obstacles.some(([ox,oz,r])=>Math.hypot(a-ox,b-oz)<r+.23);
+ let nx=x+dx,nz=z+dz;
+ if(!blocked(nx,nz))return {x:nx,z:nz};
+ let normal=null;
+ for(const [ox,oz,r] of obstacles)if(Math.hypot(nx-ox,nz-oz)<r+.23){normal=[nx-ox,nz-oz];break;}
+ if(!normal)normal=[height(nx-.15,nz)-height(nx+.15,nz),height(nx,nz-.15)-height(nx,nz+.15)];
+ const length=Math.hypot(...normal);if(length<.0001)return {x,z};
+ const [ax,az]=normal.map(n=>n/length),dot=dx*ax+dz*az;
+ if(dot<0){dx-=dot*ax;dz-=dot*az;}
+ nx=x+dx;nz=z+dz;
+ return blocked(nx,nz)?{x,z}:{x:nx,z:nz};
+}
 
 const canvas=document.querySelector('#world'),gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
 if(!gl){document.querySelector('#error').hidden=false;document.querySelector('#begin').disabled=true;throw Error('WebGL unavailable');}
@@ -96,28 +126,27 @@ function box(x,y,z,w,h,d,col){const a=[x-w/2,y,z-d/2],b=[x+w/2,y,z-d/2],c=[x+w/2
 function branch(a,b,r,col){let axis=b.map((v,i)=>v-a[i]);const len=Math.hypot(...axis);axis=axis.map(x=>x/len);let u=Math.abs(axis[1])<.9?[0,1,0]:[1,0,0];u=[axis[1]*u[2]-axis[2]*u[1],axis[2]*u[0]-axis[0]*u[2],axis[0]*u[1]-axis[1]*u[0]];const n=Math.hypot(...u);u=u.map(x=>x/n);const v=[axis[1]*u[2]-axis[2]*u[1],axis[2]*u[0]-axis[0]*u[2],axis[0]*u[1]-axis[1]*u[0]];for(let i=0;i<6;i++){const pt=(p,i,r)=>p.map((p,j)=>p+r*(u[j]*Math.cos(i*Math.PI/3)+v[j]*Math.sin(i*Math.PI/3)));quad(pt(a,i,r),pt(a,i+1,r),pt(b,i+1,r*.65),pt(b,i,r*.65),col);}}
 function torus(x,y,z,r,t,col,vertical=false){for(let i=0;i<24;i++)for(let j=0;j<5;j++){function p(i,j){const a=i/24*Math.PI*2,b=j/5*Math.PI*2,rr=r+t*Math.cos(b);return vertical?[x+rr*Math.cos(a),y+rr*Math.sin(a),z+t*Math.sin(b)]:[x+rr*Math.cos(a),y+t*Math.sin(b),z+rr*Math.sin(a)]}quad(p(i,j),p(i+1,j),p(i+1,j+1),p(i,j+1),col);}}
 function batch(){const arr=new Float32Array(data);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);const b={buffer,count:data.length/9};data=[];return b;}
-const path=[[8,32],[5,22],[0,12],[-3,1],[-4,-11]];
-function distancePath(x,z,points=path){let d=Infinity;for(let i=1;i<points.length;i++){const [ax,az]=points[i-1],[bx,bz]=points[i],t=clamp(((x-ax)*(bx-ax)+(z-az)*(bz-az))/((bx-ax)**2+(bz-az)**2),0,1);d=Math.min(d,Math.hypot(x-ax-t*(bx-ax),z-az-t*(bz-az)));}return d;}
-function terrainColor(x,z){const h=height(x,z),p=Math.min(distancePath(x,z),distancePath(x,z,[[0,12],[12,12],[23,8]]));let col=h<.9?pal.sand:h>5?hex('aab4a3'):p<1.45?hex('d8ceb5'):pal.grass;const v=rnd(-.018,.018);return col.map(c=>clamp(c+v,0,1));}
-for(let z=-58;z<56;z+=1.5)for(let x=-60;x<52;x+=1.5){const a=[x,height(x,z),z],b=[x+1.5,height(x+1.5,z),z],c=[x+1.5,height(x+1.5,z+1.5),z+1.5],d=[x,height(x,z+1.5),z+1.5];tri(a,d,b,terrainColor(x+.5,z+.5));tri(b,d,c,terrainColor(x+1,z+1));}
+const path=routes[0];
+function terrainColor(x,z){const h=height(x,z),p=distanceToRoute(x,z);let col=h<.95?pal.sand:p<1.5?hex('d8ceb5'):z<-90?hex('adb9ae'):z<-38&&x<-18?hex('b7adbc'):z<-48&&x>17?hex('bfc3a0'):pal.grass;const v=rnd(-.018,.018);return col.map(c=>clamp(c+v,0,1));}
+for(let z=-126;z<56;z+=1.5)for(let x=-69;x<69;x+=1.5){const a=[x,height(x,z),z],b=[x+1.5,height(x+1.5,z),z],c=[x+1.5,height(x+1.5,z+1.5),z+1.5],d=[x,height(x,z+1.5),z+1.5];tri(a,d,b,terrainColor(x+.5,z+.5));tri(b,d,c,terrainColor(x+1,z+1));}
 const terrain=batch();
 // Low islands soften the horizon around the miniature inland sea.
 for(let i=0;i<19;i++){const a=i/19*Math.PI*2,r=rnd(170,260);sphere(Math.cos(a)*r,-3,Math.sin(a)*r,rnd(15,38),rnd(7,15),rnd(12,28),hex(i%2?'aebfba':'b5c4be'),12,5);}
 const distant=batch();
 const obstacles=[],steppingStones=[];
 function rock(x,z,s){let y=height(x,z);sphere(x,y+s*.23,z,s,s*.55,s*.72,pal.stone,7,4);if(s>.7&&y>.3)obstacles.push([x,z,s*.6]);}
-for(let i=0;i<85;i++){let a=rnd(0,Math.PI*2),r=rnd(.82,1.07),x=Math.cos(a)*35*r,z=Math.sin(a)*39*r;if(height(x,z)>-.4)rock(x,z,rnd(.3,1.2));}
+for(let i=0;i<85;i++){let a=rnd(0,Math.PI*2),r=rnd(.82,1.07),x=Math.cos(a)*35*r,z=Math.sin(a)*39*r;if(height(x,z)>-.4&&distanceToRoute(x,z)>2.8)rock(x,z,rnd(.3,1.2));}
 // A few worn stepping stones lead inland.
 for(let i=0;i<22;i++){const t=i/21,j=Math.floor(t*(path.length-1)),u=t*(path.length-1)-j;const a=path[Math.min(j,path.length-2)],b=path[Math.min(j+1,path.length-1)],x=a[0]*(1-u)+b[0]*u+rnd(-.5,.5),z=a[1]*(1-u)+b[1]*u; sphere(x,height(x,z)+.025,z,.36,.065,.25,hex('bdbfb0'),7,3);steppingStones.push([x,z]);}
 function olive(x,z,s=1){const y=height(x,z);branch([x,y,z],[x+.12*s,y+2.15*s,z],.12*s,pal.bark);for(let i=0;i<4;i++){const a=i*2.4,dx=Math.cos(a)*.7*s,dz=Math.sin(a)*.65*s;branch([x,y+1.1*s,z],[x+dx,y+2.5*s,z+dz],.06*s,pal.bark);sphere(x+dx,y+2.6*s,z+dz,.85*s,.5*s,.72*s,i%2?pal.olive:hex('a8b7a1'),9,5);}obstacles.push([x,z,.25*s]);}
-for(let i=0;i<64;i++){const x=rnd(-29,29),z=rnd(-30,27);if(height(x,z)<1.2||distancePath(x,z)<3||Math.hypot(x+4,z+12)<6||Math.hypot(x-23,z-8)<4)continue;olive(x,z,rnd(.8,1.25));}
+for(let i=0;i<64;i++){const x=rnd(-29,29),z=rnd(-30,27);if(height(x,z)<1.2||distanceToRoute(x,z)<3||Math.hypot(x+4,z+12)<6||Math.hypot(x-23,z-8)<4)continue;olive(x,z,rnd(.8,1.25));}
 // Surreal plants: striped umbrella fungi and curled sea ferns.
 function mushroom(x,z,s,hue=0){const y=height(x,z),c=[pal.purple,pal.pink,pal.blue][hue];cone(x,y,z,.1*s,.15*s,1.65*s,pal.cream,8);sphere(x,y+1.65*s,z,.9*s,.37*s,.9*s,c,18,6);for(let j=0;j<3;j++)torus(x,y+(1.68+j*.09)*s,z,(.78-j*.19)*s,.025*s,j%2?pal.cream:pal.pink);for(let i=0;i<5;i++){const a=i*1.26;sphere(x+Math.cos(a)*.44*s,y+1.94*s,z+Math.sin(a)*.44*s,.07*s,.025*s,.07*s,pal.cream,5,3);}obstacles.push([x,z,.22*s]);}
 function fern(x,z,s){const y=height(x,z);for(let i=0;i<4;i++){const a=i*1.5,dx=Math.cos(a),dz=Math.sin(a);let p=[x,y,z];for(let j=1;j<=8;j++){const t=j/8,b=[x+dx*Math.sin(t*2.6)*.8*s,y+t*2.1*s,z+dz*Math.sin(t*2.6)*.8*s];branch(p,b,.035*s,j%2?pal.purple:pal.pink);if(j>2&&j<7)sphere(b[0]+dz*.18*s,b[1],b[2]-dx*.18*s,.21*s,.07*s,.11*s,j%2?pal.blue:pal.pink,6,3);p=b;}sphere(p[0],p[1],p[2],.13*s,.14*s,.13*s,pal.cream,7,4);}}
 for(const [x,z,s,c] of [[-4,24,1.25,0],[-6,23,.65,1],[-3,22,.7,2],[15,21,1.45,1],[17,19,.75,0],[19,22,.5,2],[-14,6,1.6,0],[-16,7,.9,2],[-13,8,.6,1],[9,-4,1.1,0],[10,-7,.65,1],[-24,-10,1.4,2],[-46,22,1.2,1]])mushroom(x,z,s,c);
-for(let i=0;i<34;i++){const x=rnd(-28,28),z=rnd(-29,30);if(height(x,z)>1&&distancePath(x,z)>2.4)fern(x,z,rnd(.45,.9));}
+for(let i=0;i<34;i++){const x=rnd(-28,28),z=rnd(-29,30);if(height(x,z)>1&&distanceToRoute(x,z)>2.4)fern(x,z,rnd(.45,.9));}
 // Tiny pastel grass, flowers, and salt-worn pebbles.
-for(let i=0;i<600;i++){const x=rnd(-34,34),z=rnd(-38,38),y=height(x,z);if(y<1||distancePath(x,z)<2)continue;const s=rnd(.12,.35),c=i%5===0?pal.pink:hex('a0b393');tri([x-.09,y,z],[x,y+s,z],[x+.09,y,z],c);tri([x,y,z-.09],[x,y+s,z],[x,y,z+.09],c);if(i%11===0)sphere(x,y+s,z,.07,.06,.07,pal.cream,5,3);}
+for(let i=0;i<600;i++){const x=rnd(-34,34),z=rnd(-38,38),y=height(x,z);if(y<1||distanceToRoute(x,z)<2)continue;const s=rnd(.12,.35),c=i%5===0?pal.pink:hex('a0b393');tri([x-.09,y,z],[x,y+s,z],[x+.09,y,z],c);tri([x,y,z-.09],[x,y+s,z],[x,y,z+.09],c);if(i%11===0)sphere(x,y+s,z,.07,.06,.07,pal.cream,5,3);}
 // Torii, with a subdued vermilion pigment washed by sea air.
 const tx=23,tz=8,ty=height(tx,tz);for(const x of [tx-1.55,tx+1.55]){cone(x,ty,tz,.17,.14,3.8,pal.red,9);box(x,ty-.02,tz,.6,.18,.6,pal.stone);}box(tx,ty+2.9,tz,3.8,.2,.22,pal.red);box(tx,ty+3.65,tz,4.6,.25,.43,pal.red);box(tx,ty+3.91,tz,4.9,.1,.54,hex('76877e'));box(tx,ty+3.1,tz,.3,.5,.14,pal.cream);obstacles.push([tx-1.55,tz,.35],[tx+1.55,tz,.35]);
 // An empty, open-sided hill shrine. The floor remains walkable.
@@ -130,6 +159,36 @@ for(let i=0;i<18;i++)box(7.5,.35,33+i*.5,2.1,.12,.43,hex(i%2?'a6a895':'b1b09c'))
 // An old mooring ring and a few ribbons at the far end of the sandbar.
 cone(-48,height(-48,22),22,.1,.08,2.8,pal.bark);for(let i=0;i<3;i++){const x=-48+i*.24,y=height(-48,22)+2.65;quad([x,y,22],[x+.15,y,22],[x+.22,y-.8,22.1],[x+.06,y-.92,22.1],[pal.pink,pal.purple,pal.cream][i]);}
 const world=batch();
+// Northern scenery is split into small batches, so a phone need not draw plants behind it.
+const scenery=[];
+function sceneryBatch(x,z,r){scenery.push({...batch(),x,z,r});}
+function umbrella(x,z,s,tint){const y=height(x,z);branch([x,y,z],[x+.2*s,y+3.2*s,z],.14*s,pal.bark);cone(x+.2*s,y+3.05*s,z,1.55*s,.15*s,.65*s,tint,12);sphere(x+.2*s,y+3.7*s,z,.4*s,.16*s,.4*s,pal.cream,8,3);for(let i=0;i<3;i++){const a=i*2.094;branch([x,y+1.8*s,z],[x+Math.cos(a)*1.15*s,y+3.1*s,z+Math.sin(a)*1.15*s],.055*s,pal.pink);}obstacles.push([x,z,.24*s]);}
+function signpost(x,z){const y=height(x,z);box(x,y,z,.12,1.25,.12,pal.bark);box(x+.28,y+1,z,.85,.2,.1,pal.cream);obstacles.push([x,z,.2]);}
+// Tall lavender umbrellas enclose the west path; the path itself stays generous and clear.
+for(let i=0;i<42;i++){const x=rnd(-51,-16),z=rnd(-79,-37);if(height(x,z)>1.3&&distanceToRoute(x,z)>3.3)umbrella(x,z,rnd(.85,1.6),i%3?pal.purple:pal.pink);}
+for(const [x,z] of [[-32,-52],[-41,-61],[-28,-67],[-18,-47]])if(distanceToRoute(x,z)>2.5)mushroom(x,z,.9,2);
+for(const p of [[-13,-31],[-24,-48],[-38,-65]])lantern(...p);
+signpost(-12.6,-34);sceneryBatch(-31,-56,32);
+// Olive rows with low, broken retaining walls follow the hillside rather than blocking the route.
+for(const z of [-61,-68,-75])for(let x=20;x<=48;x+=6){if(height(x,z)>1&&distanceToRoute(x,z)>3.2)olive(x,z,.95);}
+for(const z of [-62.8,-69.8,-76.8])for(let x=17;x<49;x+=1.2){if(height(x,z)>.9&&distanceToRoute(x,z)>2.7)box(x,height(x,z)-.12,z,1.1,.38,.48,hex('b1b8a6'));}
+// A small field shelter and empty bench look across the eastern sea.
+const hx=44,hz=-72,hy=height(hx,hz);for(const x of [hx-1.5,hx+1.5])box(x,hy,hz,.13,2,.13,pal.bark);box(hx,hy+2,hz,3.8,.14,2.5,hex('adb5a0'));box(hx,hy+.45,hz,2.6,.14,.6,pal.bark);for(const x of [hx-1.5,hx,hx+1.5])obstacles.push([x,hz,.35]);
+lantern(32,-62);signpost(17,-58);sceneryBatch(33,-69,29);
+// Glass cove: a curved sand beach, shell spirals, reeds and pale shoreline stones.
+for(let i=0;i<18;i++){const a=2.1+i/17*1.7,x=47+Math.cos(a)*25.8,z=-44+Math.sin(a)*14.8;if(height(x,z)>0&&distanceToRoute(x,z)>2.6)rock(x,z,rnd(.35,.75));}
+for(let i=0;i<24;i++){const x=rnd(24,42),z=rnd(-60,-53),y=height(x,z);if(y<.25||y>1.6||distanceToRoute(x,z)<2)continue;for(let j=0;j<3;j++)branch([x+j*.13,y,z],[x+j*.13+.13,y+rnd(.7,1.4),z],.025,j%2?pal.blue:pal.cream);}
+const cx=33,cz=-55,cy=height(cx,cz);for(let i=0;i<26;i++){const a=i*.49,r=.08+i*.035;sphere(cx+Math.cos(a)*r,cy+.035,cz+Math.sin(a)*r,.09,.045,.07,pal.cream,5,3);}
+sceneryBatch(34,-52,22);
+// An open flower ridge leads to a high, quiet headland. No foliage obscures the sea here.
+for(let i=0;i<1000;i++){const x=rnd(-53,53),z=rnd(-112,-31),y=height(x,z);if(y<1||distanceToRoute(x,z)<2||z<-96)continue;const s=rnd(.18,.45),c=x<-15?pal.pink:pal.cream;tri([x-.11,y,z],[x,y+s,z],[x+.11,y,z],c);tri([x,y,z-.11],[x,y+s,z],[x,y,z+.11],c);if(i%7===0)sphere(x,y+s,z,.1,.07,.1,pal.purple,5,3);}
+for(const [x,z] of [[-18,-77],[-11,-84],[9,-90]])umbrella(x,z,.8,pal.blue);
+for(let i=0;i<12;i++){const a=i/12*Math.PI*2,x=6+Math.cos(a)*7,z=-104+Math.sin(a)*5;if(distanceToRoute(x,z)>3)rock(x,z,rnd(.5,1.1));}
+// Three cloth streamers, a low bench, and a sea-facing stone circle make the cape legible from afar.
+for(const x of [3.2,4.6,6]){const y=height(x,-105);branch([x,y,-105],[x,y+4,-105],.065,pal.bark);quad([x,y+3.9,-105],[x+.85,y+3.72,-105],[x+.82,y+2.4,-105],[x+.12,y+2.55,-105],x<5?pal.pink:pal.cream);obstacles.push([x,-105,.2]);}
+box(9,height(9,-103)+.4,-103,2.5,.15,.65,pal.bark);for(const x of [8.1,9.9])box(x,height(x,-103),-103,.15,.45,.5,pal.stone);
+for(const x of [8.1,9,9.9])obstacles.push([x,-103,.4]);
+lantern(3,-96);signpost(-2,-86);sceneryBatch(0,-88,78);
 // Water is an actual surface: walking remains on dry land.
 for(let z=-350;z<350;z+=10)for(let x=-350;x<350;x+=10)quad([x,0,z],[x,0,z+10],[x+10,0,z+10],[x+10,0,z],hex('a5c2be'));
 const sea=batch();
@@ -150,18 +209,20 @@ function islander(x,z,name,lines,tint){
  box(-.2,.02,.1,.19,.1,.37,ink);box(.2,.02,.1,.19,.1,.37,ink);
  npcs.push({x,z,y:height(x,z),name,lines,mesh:batch(),last:-100,index:0,angle:0});obstacles.push([x,z,.65]);
 }
-islander(3.3,18.2,'浜のひと',['……ようこそ。潮が、あなたを連れてきた。','この島では、どこへ急ぐこともありません。'], 'a3b4b2');
+islander(6.3,18.2,'浜のひと',['……ようこそ。潮が、あなたを連れてきた。','この島では、どこへ急ぐこともありません。'], 'a3b4b2');
 islander(20.5,5.3,'面を干すひと',['こんにちは。今日は、いい凪ですね。','あの花は、昨日まで青かったのですよ。'], 'b4a7bd');
 islander(-6,-15.5,'丘のひと',['おかえりなさい。……はじめまして、でしたか。','海の向こうにも、きっと、誰かの島がある。'], 'b6bba0');
 islander(-24,22,'潮待ちのひと',['道が見えるうちは、向こうまで歩けます。','あの小さな島は、夢のつづきなのだそうです。'], 'c4ada8');
+islander(-39,-58,'傘を数えるひと',['よく、ここまで。森は、雨のない日にも傘をさす。','道をぐるりと辿れば、風の畑に出られます。'], 'b9a6bc');
+islander(39,-67,'風を編むひと',['葉の裏まで、海の色でしょう。','畑の先を右へ。硝子のような入江があります。'], 'b7b999');
+islander(3,-101,'岬のひと',['ここからなら、来た道まで海のなか。','また、あの浜で会いましょう。'], 'a9b6bd');
 const CAMERA_FOV=68,RUN_SPEED=7.8,GREETING_RADIUS=4.8;
 const player={x:8,z:30,y:height(8,30)+1.65,yaw:.25,yawRate:0,localForward:0,localSide:0,vx:0,vz:0};
 let started=false,time=0,last=performance.now(),held=false,pointer={x:0,y:0},pointerOrigin=null,pointerId=null,activeTouches=new Set(),multiTouchBlocked=false,keys=new Set(),greetUntil=0,placeUntil=0,shownPlaces=new Set(),lastGreetingDistance=null;
 function resize(){const d=Math.min(devicePixelRatio||1,1.7),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}addEventListener('resize',resize);resize();
 function vp(){const f=1/Math.tan(CAMERA_FOV*Math.PI/360),aspect=canvas.width/canvas.height,n=.08,far=520,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(player.yaw),s=Math.sin(player.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*player.x+s*player.z,-player.y,-s*player.x-c*player.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
 function draw(b,offset=[0,0,0],yaw=0,water=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);}
-function render(){gl.disable(gl.DEPTH_TEST);gl.useProgram(skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);const a=gl.getAttribLocation(skyProg,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);gl.uniform1f(gl.getUniformLocation(skyProg,'yaw'),player.yaw);gl.uniform1f(gl.getUniformLocation(skyProg,'aspect'),canvas.width/canvas.height);gl.drawArrays(gl.TRIANGLES,0,3);gl.enable(gl.DEPTH_TEST);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(prog);gl.uniformMatrix4fv(loc.uVP,false,vp());gl.uniform3f(loc.uEye,player.x,player.y,player.z);gl.uniform1f(loc.uTime,reduced?0:time);draw(distant);draw(sea,[0,0,0],0,1);draw(terrain);draw(foam);draw(world);draw(clouds);for(const npc of npcs){const target=Math.atan2(player.x-npc.x,player.z-npc.z);let diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));npc.angle+=diff*.018;draw(npc.mesh,[npc.x,npc.y+(reduced?0:Math.sin(time*.75+npc.x)*.013),npc.z],npc.angle);}}
-function occupied(x,z){if(!walkable(x,z))return true;return obstacles.some(([a,b,r])=>Math.hypot(x-a,z-b)<r+.23);}
+function render(){gl.disable(gl.DEPTH_TEST);gl.useProgram(skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);const a=gl.getAttribLocation(skyProg,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);gl.uniform1f(gl.getUniformLocation(skyProg,'yaw'),player.yaw);gl.uniform1f(gl.getUniformLocation(skyProg,'aspect'),canvas.width/canvas.height);gl.drawArrays(gl.TRIANGLES,0,3);gl.enable(gl.DEPTH_TEST);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(prog);gl.uniformMatrix4fv(loc.uVP,false,vp());gl.uniform3f(loc.uEye,player.x,player.y,player.z);gl.uniform1f(loc.uTime,reduced?0:time);draw(distant);draw(sea,[0,0,0],0,1);draw(terrain);draw(foam);draw(world);for(const chunk of scenery){const dx=chunk.x-player.x,dz=chunk.z-player.z,d=Math.hypot(dx,dz);if(d<125+chunk.r&&(-dx*Math.sin(player.yaw)-dz*Math.cos(player.yaw)>-chunk.r||d<chunk.r))draw(chunk);}draw(clouds);for(const npc of npcs){const target=Math.atan2(player.x-npc.x,player.z-npc.z);let diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));npc.angle+=diff*.018;draw(npc.mesh,[npc.x,npc.y+(reduced?0:Math.sin(time*.75+npc.x)*.013),npc.z],npc.angle);}}
 function update(dt){
  let forward=0,strafe=0,turn=0;
  if(held){const i=pointerInput(pointer.x,pointer.y);forward=i.forward;strafe=i.strafe;turn=i.turn;}
@@ -181,24 +242,25 @@ function update(dt){
  // Velocity rotates with the camera immediately, so steering does not leave an old sideways drift.
  const c=Math.cos(player.yaw),s=Math.sin(player.yaw);
  player.vx=player.localSide*c-player.localForward*s;player.vz=-player.localForward*c-player.localSide*s;
- const oldX=player.x,oldZ=player.z,nx=player.x+player.vx*dt,nz=player.z+player.vz*dt;
- if(!occupied(nx,player.z))player.x=nx;if(!occupied(player.x,nz))player.z=nz;
+ const oldX=player.x,oldZ=player.z,next=moveOnIsland(player.x,player.z,player.vx*dt,player.vz*dt,obstacles);
+ player.x=next.x;player.z=next.z;
  updateFootsteps(Math.hypot(player.x-oldX,player.z-oldZ),dt);
  const floor=height(player.x,player.z)+1.65;player.y+=(floor-player.y)*(1-Math.exp(-dt*10));
  for(const npc of npcs){const dist=Math.hypot(player.x-npc.x,player.z-npc.z);if(dist<GREETING_RADIUS&&time-npc.last>23&&time>greetUntil+1){lastGreetingDistance=dist;npc.last=time;document.querySelector('#speaker').textContent=npc.name;document.querySelector('#words').textContent=npc.lines[npc.index%npc.lines.length];npc.index++;document.querySelector('#greeting').style.opacity=1;greetUntil=time+7;chime();break;}}
  if(time>greetUntil)document.querySelector('#greeting').style.opacity=0;
- const places=[['浜の入口','THE LANDING',8,27,7],['オリーブの小径','OLIVE PATH',0,8,6],['潮見の鳥居','THE TIDE GATE',23,8,6],['名のない祠','THE HILL SHRINE',-4,-13,6],['潮待ちの砂州','THE TIDAL PATH',-31,22,8],['夢のつづき','THE OTHER SHORE',-48,22,5]];
- for(const [name,en,x,z,r] of places)if(!shownPlaces.has(name)&&Math.hypot(player.x-x,player.z-z)<r&&time>placeUntil+1){shownPlaces.add(name);document.querySelector('#place-jp').textContent=name;document.querySelector('#place-en').textContent=en;document.querySelector('#place').style.opacity=1;placeUntil=time+5;break;}
+ for(const [name,en,x,z,r] of landmarks)if(!shownPlaces.has(name)&&Math.hypot(player.x-x,player.z-z)<r&&time>placeUntil-2.2){shownPlaces.add(name);document.querySelector('#place-jp').textContent=name;document.querySelector('#place-en').textContent=en;document.querySelector('#place').style.opacity=1;placeUntil=time+4;break;}
  if(time>placeUntil)document.querySelector('#place').style.opacity=0;
 }
 function frame(now){const dt=Math.min((now-last)/1000,.1);last=now;time+=dt;if(started){let remaining=dt;while(remaining>0){const step=Math.min(.025,remaining);update(step);remaining-=step;}}render();requestAnimationFrame(frame);}requestAnimationFrame(frame);
 function setPointer(e){
  if(!pointerOrigin)return;
- const r=canvas.getBoundingClientRect(),radius=clamp(Math.min(r.width,r.height)*.19,64,105);
- const axis=(d,available)=>{const travel=clamp(available,18,radius),dead=Math.min(9,travel*.18);return Math.sign(d)*clamp((Math.abs(d)-dead)/(travel-dead),0,1);};
- const dx=e.clientX-pointerOrigin.x,dy=e.clientY-pointerOrigin.y;
- pointer.x=axis(dx,dx>=0?r.right-pointerOrigin.x-12:pointerOrigin.x-r.left-12);
- pointer.y=axis(dy,dy>=0?r.bottom-pointerOrigin.y-12:pointerOrigin.y-r.top-12);
+ const r=canvas.getBoundingClientRect(),radius=clamp(Math.min(r.width,r.height)*.19,64,96);
+ let dx=e.clientX-pointerOrigin.x,dy=e.clientY-pointerOrigin.y;
+ // Follow only overshoot: turning back after a long swipe responds without retracing the whole swipe.
+ const limit=radius+16;
+ if(Math.abs(dx)>limit){pointerOrigin.x=e.clientX-Math.sign(dx)*limit;dx=Math.sign(dx)*limit;}
+ if(Math.abs(dy)>limit){pointerOrigin.y=e.clientY-Math.sign(dy)*limit;dy=Math.sign(dy)*limit;}
+ pointer=dragInput(dx,dy,r.width,r.height);
 }
 canvas.addEventListener('pointerdown',e=>{
  if(!started||e.button>0)return;
@@ -236,7 +298,7 @@ canvas.addEventListener('touchmove',e=>{if(started)e.preventDefault();},{passive
 let audioCtx,master,footBuffers={},footDistance=0,feetMoving=false,footSide=0,footstepCount=0,lastFootSurface=null;
 function surfaceAt(x,z){
  if((Math.abs(x+4)<2.35&&Math.abs(z+13)<1.9)||steppingStones.some(([a,b])=>((x-a)/.38)**2+((z-b)/.29)**2<1))return 'stone';
- if(height(x,z)<1.05||Math.min(distancePath(x,z),distancePath(x,z,[[0,12],[12,12],[23,8]]))<1.6)return 'sand';
+ if(height(x,z)<1.05||distanceToRoute(x,z)<1.6)return 'sand';
  return 'grass';
 }
 function makeFootBuffer(surface,variant){
@@ -289,7 +351,7 @@ function chime(){if(!audioCtx||audioCtx.state!=='running')return;for(const [i,f]
 function begin(){if(started)return;started=true;greetUntil=time-1;placeUntil=time-2;document.body.classList.add('playing');canvas.focus();audio();document.querySelector('#hint').textContent='一本指で、上は前進・左右は旋回。';document.querySelector('#hint').style.opacity=1;setTimeout(()=>document.querySelector('#hint').style.opacity=0,4500);}
 const beginButton=document.querySelector('#begin');beginButton.addEventListener('click',begin);beginButton.disabled=false;beginButton.removeAttribute('aria-busy');
 // Minimal diagnostic state for development; no interface is added during play.
-window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+world.count+sea.count},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};
+window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+world.count+sea.count+scenery.reduce((n,b)=>n+b.count,0)},get places(){return [...shownPlaces]},get islanders(){return npcs.length},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};
 
 </script>
 </body></html>

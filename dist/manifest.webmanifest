@@ -1,0 +1,19 @@
+{
+  "name": "凪の島 — NAGI",
+  "short_name": "凪の島",
+  "description": "淡い瀬戸内の島を歩く、一人称探索ゲーム。",
+  "lang": "ja",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#b8c9c8",
+  "theme_color": "#b8c9c8",
+  "icons": [
+    {
+      "src": "./assets/nagi-icon-120.png",
+      "sizes": "120x120",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}

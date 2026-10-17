@@ -1,5 +1,5 @@
 """Walk the production collision geometry; QA access exists only in an intercepted local module."""
-import atexit,json,math,subprocess,time
+import os,atexit,json,math,subprocess,time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1]
@@ -24,7 +24,7 @@ window._qa={
 };
 '''
 with sync_playwright() as p:
- browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
+ browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
  page=browser.new_page(viewport={'width':1100,'height':760},device_scale_factor=1)
  errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  source=(root/'dist/island.js').read_text()+probe
@@ -32,7 +32,7 @@ with sync_playwright() as p:
  page.goto('http://127.0.0.1:4174/',wait_until='networkidle');page.wait_for_function('!!window._qa');page.locator('#begin').click()
  page.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
  assert page.evaluate('nagi.worldVertices')<900000
- assert page.evaluate('nagi.islanders')==11
+ assert page.evaluate('nagi.islanders')==18
  assert page.evaluate('nagi.monuments')==5
  clearance=page.evaluate('_qa.clearance()');assert clearance['closest']>.15,clearance
  print('route obstacle clearance:',clearance,'vertices:',page.evaluate('nagi.worldVertices'),flush=True)
@@ -48,6 +48,15 @@ with sync_playwright() as p:
        ('open-pyramid',[[-120,-580]],.2),
        ('celestial-sphere',[[-110,-690],[-70,-795],[0,-840]],0),
        ('white-quarry',[[95,-730],[220,-650],[315,-525]],-1),
+       ('sea-causeway',[[290,-400],[360,-440],[430,-480]],-1.1),
+       ('mirror-salt-fields',[[510,-510],[590,-505]],.2),
+       ('reed-garden',[[650,-460],[735,-410]],-.5),
+       ('windmill-hill',[[820,-435],[910,-520]],.5),
+       ('white-lighthouse',[[1020,-575],[1110,-645]],-1.57),
+       ('sea-library',[[1075,-755]],0),
+       ('starry-sand',[[1075,-795],[980,-820],[865,-850]],0),
+       ('salt-shortcut',[[750,-790],[665,-710],[640,-570],[590,-505]],0),
+       ('eastern-return',[[640,-570],[665,-710],[590,-650],[510,-600],[430,-570],[395,-600],[340,-590],[315,-570],[315,-525]],1),
        ('spiral-garden',[[290,-400],[175,-305]],0),
        ('layered-gorge',[[65,-240],[0,-195],[-105,-245],[20,-310],[0,-390]],.1),
        ('gorge-return',[[-15,-490],[-35,-570],[-120,-580],[-35,-570],[-15,-490],[0,-390],[20,-310],[-105,-245],[0,-195],[-25,-165],[-10,-137],[10,-112],[6,-100],[12,-91],[20,-83],[36,-65],[19,-57]],0),
@@ -57,7 +66,7 @@ with sync_playwright() as p:
   page.evaluate('(yaw)=>_qa.view(yaw)',yaw);page.wait_for_timeout(400)
   page.screenshot(path=str(root/(name+'.png')))
   print(name,json.dumps({'position':result['position'],'drawnVertices':page.evaluate('nagi.renderedVertices'),'drawCalls':page.evaluate('nagi.drawCalls')}),flush=True)
- assert {'風環の丘','凪見の港町','重ね石の渓谷','ひかりの棚田','空洞のピラミッド','岬の天球','白い石切り場','ねじれの庭','薄紫の傘の森','風を待つ段々畑','硝子の入江','空に近い岬','花の尾根道'}.issubset(set(page.evaluate('nagi.places')))
+ assert {'風環の丘','凪見の港町','重ね石の渓谷','ひかりの棚田','空洞のピラミッド','岬の天球','白い石切り場','ねじれの庭','薄紫の傘の森','風を待つ段々畑','硝子の入江','空に近い岬','花の尾根道','潮を渡る石道','水鏡の塩田','葦と水路の庭','風車の丘','白灯台の岬','海の図書室','星砂の環'}.issubset(set(page.evaluate('nagi.places')))
  assert not errors,errors
  print('whole expanded island loop + gorge shortcut + cove spur + return: production movement, collisions, destination triggers and rendering passed',flush=True)
  browser.close()

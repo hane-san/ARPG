@@ -1,4 +1,4 @@
-const {height,walkable,clamp,smooth,pointerInput,dragInput,moveOnIsland,routes,landmarks,distanceToRoute,WORLD_BOUNDS,monuments,expeditionRoute,valleyRoute,MOON_DIRECTION,turnVelocity}=await import('./terrain.js'+new URL(import.meta.url).search);
+const {height,walkable,clamp,smooth,pointerInput,dragInput,moveOnIsland,routes,landmarks,distanceToRoute,WORLD_BOUNDS,monuments,expeditionRoute,valleyRoute,easternRoute,saltRoute,MOON_DIRECTION,turnVelocity,CRUISE_SPEED,travelSpeed}=await import('./terrain.js'+new URL(import.meta.url).search);
 const canvas=document.querySelector('#world'),gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
 if(!gl){document.querySelector('#error').hidden=false;document.querySelector('#begin').disabled=true;throw Error('WebGL unavailable');}
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -43,6 +43,11 @@ function terrainColor(x,z){
   col=x<-150?tintBlend(pal.grass,hex('c2bea4'),.65):hex('abbba6');
   if(Math.abs(x-.15*(z+400))<55&&z<-280&&z>-580)col=hex('b9b3a6');
   if(x>240&&z<-450&&z>-610)col=hex('d0ccbc');
+ }
+ if(x>435){
+  col=x<670?hex('d5d0ba'):x<820?hex('a4b7ad'):hex('bdc1aa');
+  if(z<-745)col=hex('d5c9bb');
+  if(x>1025&&z<-690)col=hex('c4c4b9');
  }
  if(h<1.8)col=pal.sand;
 
@@ -214,6 +219,84 @@ for(const m of monuments){const {x,z,size:r,kind}=m,y=height(x,z);
  sceneryBatch(x,z,Math.max(70,r*2));
 }
 
+// The eastern islands: low salt basins, a reed garden, windmills and a sea-facing ruin.
+// All additions use local culled batches; the original landing and skyline stay intact.
+for(const [x,z] of [[382,-462],[501,-496],[646,-443],[815,-419],[1009,-559],[1097,-671],[975,-805],[751,-773],[594,-633],[478,-598]]){
+ if(height(x,z)>1&&distanceToRoute(x,z)>7)signpost(x,z);
+}
+for(let i=0;i<22;i++){
+ const x=376+i*6,z=-482-i*1.05;
+ if(height(x,z)>0&&distanceToRoute(x,z)>9)rock(x,z,rnd(1.2,2.8));
+}
+sceneryBatch(448,-499,120);
+// Mirror-like ceramic salt trays follow the ground instead of floating through the hillside.
+for(const [cx,cz] of [[557,-477],[589,-470],[562,-546],[604,-551],[626,-527]]){
+ const w=18,d=13;
+ for(let iz=0;iz<d;iz+=2)for(let ix=0;ix<w;ix+=2){
+  const x=cx+ix-w/2,z=cz+iz-d/2;
+  if(distanceToRoute(x+1,z+1)<7)continue;
+  quad([x,height(x,z)+.055,z],[x,height(x,z+2)+.055,z+2],[x+2,height(x+2,z+2)+.055,z+2],[x+2,height(x+2,z)+.055,z],hex((ix+iz)%6?'b8cecc':'d6deda'));
+ }
+ for(let i=0;i<12;i++){const x=cx+rnd(-w/2,w/2),z=cz+rnd(-d/2,d/2);if(distanceToRoute(x,z)>8)cone(x,height(x,z)+.06,z,.45,.12,.32,pal.cream,5);}
+}
+shoreHouse(544,-530,7);lantern(579,-488);sceneryBatch(590,-516,90);
+// A sunken water garden: reeds trace actual water pockets and leave the lane open.
+for(let i=0;i<380;i++){
+ const x=rnd(676,793),z=rnd(-459,-339),y=height(x,z);
+ if(y<.2||distanceToRoute(x,z)<8)continue;
+ const h=rnd(1.2,3),tint=i%3?pal.olive:pal.blue;
+ for(const s of [-1,1])tri([x+s*.16,y,z],[x+s*.35,y+h,z+.3],[x,y+h*.45,z],tint);
+ if(i%3===0)sphere(x,y+h,z,.09,.34,.09,pal.cream,5,3);
+}
+for(const [x,z] of [[691,-401],[762,-431],[782,-388]])if(height(x,z)>1&&distanceToRoute(x,z)>9)umbrella(x,z,2,pal.blue);
+lantern(724,-395);sceneryBatch(735,-403,100);
+function windmill(x,z,h){
+ const y=height(x,z);cone(x,y,z,2.8,1.5,h,hex('d7ceba'),10);cone(x,y+h,z,2.3,0,3.5,pal.blue,10);
+ const hub=y+h-2;
+ sphere(x,hub,z+1.9,.6,.6,.6,pal.stone,8,5);
+ for(let i=0;i<4;i++){
+  const a=i*Math.PI/2+.22,px=r=>x+Math.cos(a)*r,py=r=>hub+Math.sin(a)*r;
+  branch([px(1),py(1),z+2],[px(11),py(11),z+2],.12,pal.bark);
+  quad([px(3),py(3),z+2],[px(10),py(10),z+2],[px(10)-Math.sin(a)*2.2,py(10)+Math.cos(a)*2.2,z+2],[px(3)-Math.sin(a)*1.1,py(3)+Math.cos(a)*1.1,z+2],i%2?pal.cream:hex('c4b6c8'));
+ }
+ obstacles.push([x,z,2.8]);
+}
+for(const [x,z,h] of [[878,-507,16],[927,-491,19],[945,-544,15]])windmill(x,z,h);
+for(let i=0;i<440;i++){
+ const x=rnd(846,976),z=rnd(-573,-463),y=height(x,z);if(y<1||distanceToRoute(x,z)<8)continue;
+ const col=i%3?pal.purple:pal.cream;tri([x-.3,y,z],[x,y+rnd(.6,1.2),z],[x+.3,y,z],col);
+}
+sceneryBatch(911,-520,110);
+// A white lighthouse can be seen from both sides of the eastern loop.
+const lx=1132,lz=-645,ly=height(lx,lz);
+cone(lx,ly,lz,4,2.5,30,hex('e1d9c5'),14);cone(lx,ly+30,lz,3.3,3.3,1,pal.stone,14);
+cone(lx,ly+31,lz,2.5,2.5,3,pal.blue,12);cone(lx,ly+34,lz,3.5,.1,3,pal.cream,14);
+for(let i=0;i<8;i++){const a=i*Math.PI/4;branch([lx+Math.cos(a)*2.6,ly+31,lz+Math.sin(a)*2.6],[lx+Math.cos(a)*2.6,ly+34,lz+Math.sin(a)*2.6],.07,pal.stone);}
+box(lx,ly,lz+3.9,1.8,3,.12,pal.bark);obstacles.push([lx,lz,4]);
+for(const [x,z] of [[1090,-624],[1125,-674],[1151,-637]])if(height(x,z)>1&&distanceToRoute(x,z)>9)rock(x,z,2.5);
+sceneryBatch(1123,-646,90);
+// Roofless reading room: the path passes between columns and rows of pale stone books.
+for(const dx of [-16,16])for(const dz of [-23,-8,8,23]){
+ const x=1075+dx,z=-755+dz,y=height(x,z),h=dz===23?6:11;
+ cone(x,y,z,1.2,1,h,pal.cream,8);box(x,y+h,z,3,.7,3,pal.stone);obstacles.push([x,z,1.3]);
+ if(dz<8)branch([x,y+h+.6,z],[x,height(x,z+15)+11.6,z+15],.65,pal.stone);
+}
+for(const dx of [-25,25])for(let i=0;i<9;i++){
+ const x=1075+dx,z=-779+i*6,y=height(x,z);
+ box(x,y,z,1.4,2.8+(i%3)*.5,2.5,[pal.blue,pal.cream,pal.pink][i%3]);obstacles.push([x,z,1.3]);
+}
+lantern(1062,-738);sceneryBatch(1075,-755,80);
+// Open shell circle and small pink groves on the returning shore.
+for(let i=0;i<28;i++){
+ const a=i*Math.PI*2/28,x=865+Math.cos(a)*24,z=-850+Math.sin(a)*24;
+ if(height(x,z)>.3&&distanceToRoute(x,z)>8){cone(x,height(x,z),z,1.1,.2,2.7,i%2?pal.cream:pal.pink,5);obstacles.push([x,z,.8]);}
+}
+sceneryBatch(865,-850,65);
+for(const [gx,gz] of [[820,-804],[936,-791],[698,-719],[548,-595]]){
+ for(let i=0;i<20;i++){const x=gx+rnd(-22,22),z=gz+rnd(-20,20);if(height(x,z)>1&&distanceToRoute(x,z)>9)quietTree(x,z,rnd(1.5,2.4),i%4?pal.pink:pal.blue);}
+ sceneryBatch(gx,gz,55);
+}
+
 // Water is an actual surface: walking remains on dry land.
 for(let z=-2700;z<2700;z+=90)for(let x=-2700;x<2700;x+=90)quad([x,0,z],[x,0,z+90],[x+90,0,z+90],[x+90,0,z],hex('a5c2be'));
 const sea=batch();
@@ -245,7 +328,14 @@ islander(-307,-338,'港のひと',['ようこそ、凪見へ。屋根の向こ�
 islander(3,-392,'石を聴くひと',['この谷には、海より古い音が残っています。','岩の間を抜けると、ひかりの棚田です。'], 'b9b4a4');
 islander(-123,-582,'空を測るひと',['空っぽのまま、空を支えているのです。','あちらの天球は、夜を待っています。'], 'b4a7bd');
 islander(312,-522,'白い石のひと',['石を切るたびに、別の空が見つかりました。','あの四角い影も、いつか海へ帰るのでしょう。'], 'c7bcb1');
-const CAMERA_FOV=68,RUN_SPEED=7.8,GREETING_RADIUS=4.8;
+islander(441,-465,'潮を渡るひと',['この先にも、まだ島があるのです。','東へ一巡りすると、白い石の道へ戻れます。'], 'b7bfba');
+islander(586,-490,'塩を集めるひと',['海をすくって、空を干しているところです。','葦の庭へは北の道。南は、短い帰り道です。'], 'c9c3ac');
+islander(741,-395,'水路のひと',['足音が、葉の向こうまで届きました。','風車が見えたら、灯台ももう遠くありません。'], 'a5b9b2');
+islander(902,-504,'風を読むひと',['風がなくても、ここで待っています。','白い灯台まで、道はつながっていますよ。'], 'b8abc1');
+islander(1101,-660,'灯を守るひと',['遠くまで、来ましたね。あの浜も同じ海です。','灯台の南には、屋根のない図書室があります。'], 'c9c6b5');
+islander(1086,-745,'頁をめくるひと',['ここにある本は、まだ誰も書いていません。','帰りには、砂の星を数えていってください。'], 'b1b9c0');
+islander(854,-834,'星砂のひと',['一つずつ、波が置いていったのです。','西へ辿れば、塩田を通って元の島へ戻れます。'], 'c7b1b5');
+const CAMERA_FOV=68,RUN_SPEED=CRUISE_SPEED,GREETING_RADIUS=4.8;
 const player={x:8,z:30,y:height(8,30)+1.65,yaw:.25,yawRate:0,localForward:0,localSide:0,vx:0,vz:0};
 const camera={x:player.x,y:player.y,z:player.z,yaw:player.yaw};
 let previous={...camera},accumulator=0;
@@ -282,8 +372,8 @@ function update(dt){
  const len=Math.max(1,Math.hypot(forward,strafe));forward/=len;strafe/=len;
  player.yawRate=turnVelocity(player.yawRate,turn,Math.abs(player.localForward),dt);
  player.yaw-=player.yawRate*dt;
- const boost=keys.has('ShiftLeft')||keys.has('ShiftRight')?1.12:1;
- const ahead=forward*(forward>=0?RUN_SPEED:5.4)*boost,side=strafe*5.8*boost;
+ const boost=keys.has('ShiftLeft')||keys.has('ShiftRight')?1.25:1;
+ const ahead=travelSpeed(forward)*boost,side=strafe*7.2*boost;
  const response=1-Math.exp(-dt*9);
  if(!forward&&!strafe){player.localForward=player.localSide=0;}
  else{if(ahead*player.localForward<0)player.localForward=0;player.localForward+=(ahead-player.localForward)*response;player.localSide+=(side-player.localSide)*response;}
@@ -400,7 +490,7 @@ function footstep(surface,speed){
 }
 function updateFootsteps(distance,dt){
  if(distance<.0008){footDistance=0;feetMoving=false;return;}
- const speed=distance/dt,stride=.72+Math.min(speed,8.8)*.24;
+ const speed=distance/dt,stride=.72+speed*.24;
  if(!feetMoving){footDistance=stride*.75;feetMoving=true;}
  footDistance+=distance;
  if(footDistance>=stride){footDistance%=stride;footstep(surfaceAt(player.x,player.z),speed);}

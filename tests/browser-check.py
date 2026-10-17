@@ -1,5 +1,5 @@
 """Gameplay regression checks: native touch gestures, motion, sound, and desktop keys."""
-import atexit,argparse,json,math,subprocess,sys,time
+import os,atexit,argparse,json,math,subprocess,sys,time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1]
@@ -19,7 +19,7 @@ def stopped(page):
 
 audio_probe="""window._footBuffers=[];const AC=window.AudioContext||window.webkitAudioContext;const create=AC.prototype.createBuffer;AC.prototype.createBuffer=function(...args){const buffer=create.apply(this,args);if(buffer.duration<.3)window._footBuffers.push(buffer);return buffer;};"""
 with sync_playwright() as p:
- browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
+ browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
  if args.greeting_only:
   page=browser.new_page(viewport={'width':1440,'height':900});page.goto(base,wait_until='networkidle');page.wait_for_function('!!window.nagi');page.locator('#begin').click();page.keyboard.down('w');page.wait_for_function('nagi.greeted > 0',timeout=45000);page.keyboard.up('w')
   assert page.locator('#speaker').inner_text()=='浜のひと'
@@ -31,7 +31,7 @@ with sync_playwright() as p:
   context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
   live=context.new_page();live_errors=[];live.on('pageerror',lambda e:live_errors.append(str(e)))
   response=live.goto(base,wait_until='networkidle',timeout=45000);assert response.ok
-  live.wait_for_function('window.nagi && nagi.release === "2026-10-17-wide-horizon"',timeout=30000)
+  live.wait_for_function('window.nagi && nagi.release === "2026-10-18-eastern-islands"',timeout=30000)
   icon=live.locator('link[rel="icon"]').get_attribute('href');assert live.request.get(live.evaluate('(p)=>new URL(p,location.href).href',icon)).ok
   live.locator('#begin').tap();live.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
   cdp=context.new_cdp_session(live);anchor=live.evaluate('nagi.position')
@@ -51,7 +51,7 @@ with sync_playwright() as p:
  page.goto(base,wait_until='networkidle');page.wait_for_function('!!window.nagi',timeout=30000)
  assert page.evaluate('!!window.nagi'),errors
 
- assert page.evaluate('nagi.release')=='2026-10-17-wide-horizon'
+ assert page.evaluate('nagi.release')=='2026-10-18-eastern-islands'
  page.wait_for_function('!!window._nagiVP')
  assert abs(page.evaluate('2*Math.atan(1/_nagiVP[5])*180/Math.PI')-68)<.001
  # Portrait, compact phones, tablet, and notched landscape: no overlap, clipping, or scrolling.
@@ -76,7 +76,7 @@ with sync_playwright() as p:
  assert page.locator('#arrival').evaluate("e=>getComputedStyle(e).visibility")=='hidden'
  before=page.evaluate('nagi.position');initial_steps=page.evaluate('nagi.footsteps')
  page.keyboard.down('w');moved(page,before,3)
- assert page.evaluate('nagi.speed')>7.2
+ assert page.evaluate('nagi.speed')>13.6
  page.keyboard.up('w');page.wait_for_timeout(300)
  after=page.evaluate('nagi.position')
  assert after['z']<before['z']-2 and after['yaw']==before['yaw']
@@ -118,14 +118,14 @@ with sync_playwright() as p:
  assert distance(start,mobile.evaluate('nagi.position'))<.002
  # Lower-half contact is neutral; an upward slide runs without reaching the top half.
  touch('touchStart',195,705);mobile.wait_for_timeout(1200);stopped(mobile);touch('touchMove',195,620);moved(mobile,start,3)
- assert mobile.evaluate('nagi.speed')>7.2
+ assert mobile.evaluate('nagi.speed')>13.6
  assert mobile.evaluate('nagi.footsteps')>0 and mobile.evaluate('nagi.audioState')=='running'
  touch('touchEnd');stopped(mobile)
  forward=mobile.evaluate('nagi.position')
  assert forward['z']<start['z']-2 and forward['yaw']==start['yaw']
  # A twelve-pixel slide remains active without any further move events.
  short=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,693);moved(mobile,short,1)
- assert 2.6<mobile.evaluate('nagi.speed')<4.2
+ assert 2.6<mobile.evaluate('nagi.speed')<4.5
  steady=mobile.evaluate('nagi.position');moved(mobile,steady,.6)
  assert abs(mobile.evaluate('nagi.position.yaw')-short['yaw'])<.00001
  touch('touchEnd');stopped(mobile)
@@ -148,7 +148,8 @@ with sync_playwright() as p:
  curve_start=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',225,620);moved(mobile,curve_start,2)
  curve_end=mobile.evaluate('nagi.position')
  assert curve_end['yaw']<curve_start['yaw']-.015
- assert mobile.evaluate('nagi.speed')>7.2
+ mobile.wait_for_function('nagi.speed>13.6',timeout=15000)
+ assert mobile.evaluate('nagi.speed')>13.6
  # Recenter while still holding: both throttle and rotation stop, without lifting the finger.
  touch('touchMove',195,705);stopped(mobile);yaw=mobile.evaluate('nagi.position.yaw');mobile.wait_for_timeout(400);assert abs(mobile.evaluate('nagi.position.yaw')-yaw)<.0001
  touch('touchEnd')

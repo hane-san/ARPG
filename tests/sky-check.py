@@ -1,5 +1,5 @@
 """Verify the actual fragment shader, rather than only the matching projection mathematics."""
-import atexit,json,subprocess,time
+import os,atexit,json,subprocess,time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1]
@@ -16,7 +16,7 @@ window._skyQA=(yaw)=>{
 };
 '''
 with sync_playwright() as p:
- browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
+ browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
  page=browser.new_page(viewport={'width':1000,'height':700});errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  page.route('**/island.js?*',lambda r:r.fulfill(status=200,content_type='application/javascript',body=(root/'dist/island.js').read_text()+probe))
  page.goto('http://127.0.0.1:4176/',wait_until='networkidle');page.wait_for_function('!!window._skyQA')

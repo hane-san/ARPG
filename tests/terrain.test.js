@@ -1,4 +1,4 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {height,walkable,pointerInput,dragInput,moveOnIsland,routes,landmarks,MOON_DIRECTION,skyRay,turnVelocity,WORLD_BOUNDS} from '../dist/terrain.js';
+import test from 'node:test';import assert from 'node:assert/strict';import {height,walkable,pointerInput,dragInput,moveOnIsland,routes,landmarks,MOON_DIRECTION,skyRay,turnVelocity,WORLD_BOUNDS,CRUISE_SPEED,travelSpeed} from '../dist/terrain.js';
 test('one-thumb horizontal strokes steer without any lateral translation',()=>{
  for(let x=-1;x<=1;x+=.02){const p=pointerInput(x,0);assert.equal(p.strafe,0);assert.equal(p.forward,0);assert.ok(Math.abs(p.turn)<=1);assert.ok(Math.abs(p.turn+pointerInput(-x,0).turn)<1e-10);}
  assert.equal(pointerInput(1,0).turn,1);assert.equal(pointerInput(-1,0).turn,-1);
@@ -50,12 +50,24 @@ test('short slides give a sustained range from walking to running without compro
  let last=0;for(let y=4;y<=36;y++){const d=dragInput(0,-y,390,844),p=pointerInput(d.x,d.y);assert.ok(p.forward>=last);assert.equal(p.turn,0);last=p.forward;}
  const d=dragInput(0,-12,390,844);assert.ok(pointerInput(d.x,d.y).forward>.35);assert.equal(dragInput(0,-34,390,844).y,-1);
 });
+test('long strokes run faster while close-up walking stays controllable',()=>{
+ assert.equal(travelSpeed(1),14.4);assert.equal(travelSpeed(-1),-7.2);assert.equal(travelSpeed(0),0);
+ const fine=pointerInput(0,dragInput(0,-7,390,844).y).forward;
+ const walking=pointerInput(0,dragInput(0,-12,390,844).y).forward;
+ assert.ok(travelSpeed(fine)<2.1);assert.ok(travelSpeed(walking)>3&&travelSpeed(walking)<4.5);
+ let previous=0;for(let t=0;t<=1;t+=.01){assert.ok(travelSpeed(t)>=previous);previous=travelSpeed(t);}
+});
+test('fast movement cannot tunnel through small obstacles or escape the coast',()=>{
+ const next=moveOnIsland(8,27,0,-5,[[8,24,.16]]);
+ assert.ok(next.z>=24.39-1e-8);assert.ok(walkable(next.x,next.z));
+ const coast=moveOnIsland(8,30,0,40);assert.ok(walkable(coast.x,coast.z));assert.ok(coast.z<45);
+});
 test('turning has bounded acceleration, lower speed while running, and no release drift',()=>{
  let standing=0,running=0;for(let i=0;i<120;i++){
-  const next=turnVelocity(running,1,7.8,1/60);assert.ok(Math.abs(next-running)<=2.8/60+1e-12);running=next;
+  const next=turnVelocity(running,1,CRUISE_SPEED,1/60);assert.ok(Math.abs(next-running)<=2.8/60+1e-12);running=next;
   standing=turnVelocity(standing,1,0,1/60);
  }
- assert.ok(running<1&&running>.9);assert.ok(standing<1.26&&standing>1.2);assert.equal(turnVelocity(running,0,7.8,1/60),0);
+ assert.ok(running<1&&running>.9);assert.ok(standing<1.26&&standing>1.2);assert.equal(turnVelocity(running,0,CRUISE_SPEED,1/60),0);
 });
 test('the sky rotates as a world direction, with a celestial body visible in only one hemisphere',()=>{
  const yaw=Math.atan2(-MOON_DIRECTION[0],-MOON_DIRECTION[2]),elevation=Math.asin(MOON_DIRECTION[1]),v=.5+.5*Math.tan(elevation)/Math.tan(68*Math.PI/360);

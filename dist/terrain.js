@@ -17,10 +17,15 @@ function originalHeight(x,z){
  return Math.max(-3,main,bar,islet,north);
 }
 // A compressed, kilometre-wide Setouchi-inspired island, not a real-world replica.
-export const WORLD_BOUNDS={minX:-512,maxX:512,minZ:-1024,maxZ:64};
+export const WORLD_BOUNDS={minX:-512,maxX:1280,minZ:-1024,maxZ:64};
 export const expeditionRoute=[[6,-100],[10,-112],[-10,-137],[-25,-165],[0,-195],[-105,-245],[-245,-285],[-310,-335],[-265,-425],[-225,-510],[-120,-580],[-110,-690],[-70,-795],[0,-840],[95,-730],[220,-650],[315,-525],[290,-400],[175,-305],[65,-240],[0,-195]];
 export const valleyRoute=[[-105,-245],[20,-310],[0,-390],[-15,-490],[-35,-570],[-120,-580]];
 routes.push(expeditionRoute,valleyRoute);
+// Two entrances, a complete eastern circuit, and a short return through the salt fields.
+export const easternRoute=[[290,-400],[360,-440],[430,-480],[510,-510],[590,-505],[650,-460],[735,-410],[820,-435],[910,-520],[1020,-575],[1110,-645],[1075,-755],[1075,-795],[980,-820],[865,-850],[750,-790],[665,-710],[590,-650],[510,-600],[430,-570],[395,-600],[340,-590],[315,-570],[315,-525]];
+export const saltRoute=[[590,-505],[640,-570],[665,-710]];
+routes.push(easternRoute,saltRoute);
+landmarks.push(['潮を渡る石道','THE SEA CAUSEWAY',430,-480,26],['水鏡の塩田','THE MIRROR SALT FIELDS',590,-505,30],['葦と水路の庭','THE REED GARDEN',735,-410,30],['風車の丘','THE WINDMILL HILL',910,-520,30],['白灯台の岬','THE WHITE LIGHTHOUSE',1110,-645,30],['海の図書室','THE SEA LIBRARY',1075,-755,30],['星砂の環','THE STARRY SAND',865,-850,30]);
 landmarks.push(['風環の丘','THE WIND RING',-105,-245,25],['凪見の港町','NAGIMI HARBOUR',-310,-335,30],['重ね石の渓谷','THE LAYERED GORGE',0,-390,25],['ひかりの棚田','THE TERRACED FIELDS',-225,-510,28],['空洞のピラミッド','THE OPEN PYRAMID',-120,-580,28],['岬の天球','THE CELESTIAL SPHERE',0,-840,28],['白い石切り場','THE WHITE QUARRY',315,-525,28],['ねじれの庭','THE SPIRAL GARDEN',175,-305,25]);
 export const monuments=[{kind:'ring',x:-105,z:-245,size:22},{kind:'pyramid',x:-120,z:-580,size:28},{kind:'sphere',x:0,z:-840,size:14},{kind:'cube',x:338,z:-535,size:22},{kind:'spiral',x:175,z:-305,size:20}];
 function rawHeight(x,z){
@@ -35,7 +40,14 @@ function rawHeight(x,z){
  const bay=Math.hypot((x-420)/100,(z+370)/100);
  const inlet=Math.hypot((x+240)/65,(z+720)/105);
  land=Math.min(land,(bay-1)*28,(inlet-1)*20);
- return Math.max(old,land,-3);
+ let east=Math.max(lobe(510,-535,155,100,3,5),lobe(695,-480,190,180,5,10),lobe(950,-610,260,230,7,35),lobe(850,-785,230,160,4,12));
+ east=Math.max(east,2.8-distanceToRoute(x,z,[[easternRoute[0],easternRoute[1],easternRoute[2],easternRoute[3]]])*.25);
+ // Bays and a sheltered lagoon break up the new land; the circuit follows their dry shores.
+ east=Math.min(east,(Math.hypot((x-820)/130,(z+285)/130)-1)*22,(Math.hypot((x-620)/120,(z+820)/90)-1)*20);
+ east=Math.min(east,(Math.hypot((x-800)/68,(z+625)/76)-1)*18);
+ for(const [px,pz] of [[708,-365],[777,-371]])east=Math.min(east,(Math.hypot((x-px)/22,(z-pz)/16)-1)*9);
+ east=Math.max(east,3.2-distanceToRoute(x,z,[easternRoute.slice(15),saltRoute])*.2);
+ return Math.max(old,land,east,-3);
 }
 // The collision surface uses the same triangles as the mesh. Camera height never chases a different floor.
 export function terrainStep(x,z){return x>=-64&&x<=64&&z>=-128&&z<=64?2:8;}
@@ -52,9 +64,15 @@ export function height(x,z){
 }
 export const MOON_DIRECTION=(()=>{const v=[-.3,.31,-.9],n=Math.hypot(...v);return v.map(x=>x/n)})();
 export function skyRay(u,v,yaw,aspect,fov=68){const t=Math.tan(fov*Math.PI/360),x=(u*2-1)*aspect*t,y=(v*2-1)*t,z=-1,c=Math.cos(yaw),s=Math.sin(yaw),ray=[c*x+s*z,y,-s*x+c*z],n=Math.hypot(...ray);return ray.map(a=>a/n);}
+export const CRUISE_SPEED=14.4;
+// Preserve close-up walking; extra speed arrives progressively in the final half of a stroke.
+export function travelSpeed(throttle){
+ const t=clamp(throttle,-1,1);
+ return t>=0?7.8*t+(CRUISE_SPEED-7.8)*t**3:7.2*t;
+}
 export function turnVelocity(current,input,speed,dt){
  if(Math.abs(input)<.00001)return 0;
- const target=clamp(input,-1,1)*(1.25-.3*smooth(0,7.8,speed));
+ const target=clamp(input,-1,1)*(1.25-.3*smooth(0,CRUISE_SPEED,speed));
  const delta=(target-current)*(1-Math.exp(-dt*9));return current+clamp(delta,-2.8*dt,2.8*dt);
 }
 // One thumb: independent throttle and steering, never an implicit strafe/turn switch.
@@ -72,6 +90,9 @@ export function dragInput(dx,dy,width,height){
 }
 // Resolve a full vector first, then slide along the contact tangent. No preferred world X/Z axis.
 export function moveOnIsland(x,z,dx,dz,obstacles=[]){
+ // Swept substeps keep a fast run from skipping narrow trunks or the edge of a sandbar.
+ const steps=Math.ceil(Math.hypot(dx,dz)/.3);
+ if(steps>1){for(let i=0;i<steps;i++){const next=moveOnIsland(x,z,dx/steps,dz/steps,obstacles);x=next.x;z=next.z;}return {x,z};}
  const blocked=(a,b)=>!walkable(a,b)||obstacles.some(([ox,oz,r])=>Math.hypot(a-ox,b-oz)<r+.23);
  let nx=x+dx,nz=z+dz;
  if(!blocked(nx,nz))return {x:nx,z:nz};

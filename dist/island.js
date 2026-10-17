@@ -1,14 +1,26 @@
-const {height,walkable,clamp,smooth,pointerInput,dragInput,moveOnIsland,routes,landmarks,distanceToRoute}=await import('./terrain.js'+new URL(import.meta.url).search);
+const {height,walkable,clamp,smooth,pointerInput,dragInput,moveOnIsland,routes,landmarks,distanceToRoute,WORLD_BOUNDS,monuments,expeditionRoute,valleyRoute,MOON_DIRECTION,turnVelocity}=await import('./terrain.js'+new URL(import.meta.url).search);
 const canvas=document.querySelector('#world'),gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
 if(!gl){document.querySelector('#error').hidden=false;document.querySelector('#begin').disabled=true;throw Error('WebGL unavailable');}
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const vs=`attribute vec3 aP,aN,aC;uniform mat4 uVP;uniform vec3 uOffset,uEye;uniform float uYaw,uTime,uWater;varying vec3 vC,vN,vP;varying float vD;void main(){float c=cos(uYaw),s=sin(uYaw);mat3 r=mat3(c,0.,-s,0.,1.,0.,s,0.,c);vec3 p=r*aP+uOffset;if(uWater>.5)p.y+=.055*sin(p.x*.35+uTime*.45)+.04*cos(p.z*.46-uTime*.38);vP=p;vN=r*aN;vC=aC;vD=length(p-uEye);gl_Position=uVP*vec4(p,1.);}`;
-const fs=`precision highp float;varying vec3 vC,vN,vP;varying float vD;uniform float uTime,uWater;void main(){float light=.79+.21*abs(dot(normalize(vN),normalize(vec3(-.4,.85,.3))));vec3 col=vC*light;if(uWater>.5){float wave=sin(vP.x*.64+vP.z*.75+uTime*.5)*sin(vP.z*.43-uTime*.36);col+=smoothstep(.65,1.,wave)*.032;float gleam=pow(max(0.,sin(vP.x*.1+vP.z*.23)),28.)*.025;col+=gleam;}float fog=1.-exp(-vD*.008);fog=clamp(fog,0.,.97);col=mix(col,vec3(.77,.824,.815),fog);gl_FragColor=vec4(col,1.);}`;
+const fs=`precision highp float;varying vec3 vC,vN,vP;varying float vD;uniform float uTime,uWater;void main(){float light=.79+.21*abs(dot(normalize(vN),normalize(vec3(-.4,.85,.3))));vec3 col=vC*light;if(uWater>.5){float wave=sin(vP.x*.64+vP.z*.75+uTime*.5)*sin(vP.z*.43-uTime*.36);col+=smoothstep(.65,1.,wave)*.015;float gleam=pow(max(0.,sin(vP.x*.1+vP.z*.23)),28.)*.012;col+=gleam;}float fog=1.-exp(-vD*.0019);fog=clamp(fog,0.,.97);col=mix(col,vec3(.77,.824,.815),fog);gl_FragColor=vec4(col,1.);}`;
 function shader(type,source){const sh=gl.createShader(type);gl.shaderSource(sh,source);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh;}
 function program(v,f){const p=gl.createProgram();gl.attachShader(p,shader(gl.VERTEX_SHADER,v));gl.attachShader(p,shader(gl.FRAGMENT_SHADER,f));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p;}
 const prog=program(vs,fs),loc={};for(const n of ['uVP','uOffset','uEye','uYaw','uTime','uWater'])loc[n]=gl.getUniformLocation(prog,n);
 const attrs=['aP','aN','aC'].map(n=>gl.getAttribLocation(prog,n));
-const skyProg=program(`attribute vec2 a;varying vec2 v;void main(){v=a*.5+.5;gl_Position=vec4(a,.9999,1.);}`,`precision mediump float;varying vec2 v;uniform float yaw,aspect;void main(){vec3 c=mix(vec3(.823,.837,.791),vec3(.663,.758,.785),smoothstep(.27,1.,v.y));float d=length((v-vec2(.69-sin(yaw)*.3,.70))*vec2(aspect,1.));c=mix(c,vec3(.94,.868,.733),.25*exp(-d*7.));c=mix(c,vec3(.947,.906,.802),1.-smoothstep(.034,.036,d));gl_FragColor=vec4(c,1.);}`);
+const skyProg=program(`attribute vec2 a;varying vec2 v;void main(){v=a*.5+.5;gl_Position=vec4(a,.9999,1.);}`,`precision highp float;varying vec2 v;uniform float yaw,aspect,tanHalfFov;uniform vec3 moonDirection;
+void main(){
+ vec3 cameraRay=normalize(vec3((v.x*2.-1.)*aspect*tanHalfFov,(v.y*2.-1.)*tanHalfFov,-1.));
+ float c=cos(yaw),s=sin(yaw);vec3 ray=normalize(vec3(c*cameraRay.x+s*cameraRay.z,cameraRay.y,-s*cameraRay.x+c*cameraRay.z));
+ vec3 col=mix(vec3(.77,.824,.815),vec3(.663,.758,.785),smoothstep(0.,.8,ray.y));
+ float alignment=clamp(dot(ray,moonDirection),-1.,1.);
+ float disc=smoothstep(.9999568,.9999639,alignment);
+ float marks=.018*sin(dot(ray,vec3(160.,90.,40.)))*sin(dot(ray,vec3(30.,120.,170.)));
+ col=mix(col,vec3(.93,.906,.815)-marks,disc);
+ col+=vec3(.012,.01,.004)*exp(-max(0.,1.-alignment)*1800.);
+ gl_FragColor=vec4(col,1.);
+}`);
+const skyLoc=Object.fromEntries(['yaw','aspect','tanHalfFov','moonDirection'].map(n=>[n,gl.getUniformLocation(skyProg,n)]));
 const skyBuf=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);gl.bufferData(gl.ARRAY_BUFFER,new Float32Array([-1,-1,3,-1,-1,3]),gl.STATIC_DRAW);
 let seed=12815;function random(){seed=(1664525*seed+1013904223)>>>0;return seed/4294967296;}const rnd=(a,b)=>a+(b-a)*random();
 const hex=s=>{const n=parseInt(s.replace('#',''),16);return[n>>16&255,n>>8&255,n&255].map(x=>x/255)};
@@ -22,11 +34,64 @@ function branch(a,b,r,col){let axis=b.map((v,i)=>v-a[i]);const len=Math.hypot(..
 function torus(x,y,z,r,t,col,vertical=false){for(let i=0;i<24;i++)for(let j=0;j<5;j++){function p(i,j){const a=i/24*Math.PI*2,b=j/5*Math.PI*2,rr=r+t*Math.cos(b);return vertical?[x+rr*Math.cos(a),y+rr*Math.sin(a),z+t*Math.sin(b)]:[x+rr*Math.cos(a),y+t*Math.sin(b),z+rr*Math.sin(a)]}quad(p(i,j),p(i+1,j),p(i+1,j+1),p(i,j+1),col);}}
 function batch(){const arr=new Float32Array(data);const buffer=gl.createBuffer();gl.bindBuffer(gl.ARRAY_BUFFER,buffer);gl.bufferData(gl.ARRAY_BUFFER,arr,gl.STATIC_DRAW);const b={buffer,count:data.length/9};data=[];return b;}
 const path=routes[0];
-function terrainColor(x,z){const h=height(x,z),p=distanceToRoute(x,z);let col=h<.95?pal.sand:p<1.5?hex('d8ceb5'):z<-90?hex('adb9ae'):z<-38&&x<-18?hex('b7adbc'):z<-48&&x>17?hex('bfc3a0'):pal.grass;const v=rnd(-.018,.018);return col.map(c=>clamp(c+v,0,1));}
-for(let z=-126;z<56;z+=1.5)for(let x=-69;x<69;x+=1.5){const a=[x,height(x,z),z],b=[x+1.5,height(x+1.5,z),z],c=[x+1.5,height(x+1.5,z+1.5),z+1.5],d=[x,height(x,z+1.5),z+1.5];tri(a,d,b,terrainColor(x+.5,z+.5));tri(b,d,c,terrainColor(x+1,z+1));}
-const terrain=batch();
+const tintBlend=(a,b,t)=>a.map((v,i)=>v+(b[i]-v)*t);
+function terrainColor(x,z){
+ const h=height(x,z);
+ let col=pal.grass;
+ col=tintBlend(col,hex('b7adbc'),(1-smooth(-18,-8,x))*(1-smooth(-42,-32,z))*smooth(-95,-80,z));
+ if(z<-128){
+  col=x<-150?tintBlend(pal.grass,hex('c2bea4'),.65):hex('abbba6');
+  if(Math.abs(x-.15*(z+400))<55&&z<-280&&z>-580)col=hex('b9b3a6');
+  if(x>240&&z<-450&&z>-610)col=hex('d0ccbc');
+ }
+ if(h<1.8)col=pal.sand;
+
+ const v=rnd(-.012,.012);return col.map(c=>clamp(c+v,0,1));
+}
+// Clip path ribbons to the exact ground triangles: continuous paths without hovering over hills.
+const roadSegments=[];
+for(const points of routes)for(let i=1;i<points.length;i++){
+ const [ax,az]=points[i-1],[bx,bz]=points[i],len=Math.hypot(bx-ax,bz-az),w=Math.min(az,bz)<-128?4.2:1.45,nx=-(bz-az)/len*w,nz=(bx-ax)/len*w;
+ roadSegments.push({polygon:[[ax+nx,az+nz],[bx+nx,bz+nz],[bx-nx,bz-nz],[ax-nx,az-nz]],minX:Math.min(ax,bx)-w,maxX:Math.max(ax,bx)+w,minZ:Math.min(az,bz)-w,maxZ:Math.max(az,bz)+w});
+}
+function clipRoad(polygon,triangle){
+ let out=polygon;
+ const cross=(a,b,p)=>(b[0]-a[0])*(p[1]-a[1])-(b[1]-a[1])*(p[0]-a[0]);
+ for(let i=0;i<3&&out.length;i++){
+  const a=triangle[i],b=triangle[(i+1)%3],input=out;out=[];
+  for(let j=0;j<input.length;j++){
+   const p=input[j],q=input[(j+1)%input.length],dp=cross(a,b,p),dq=cross(a,b,q);
+   if(dp>=-.00001)out.push(p);
+   if((dp>=0)!==(dq>=0)){const t=dp/(dp-dq);out.push([p[0]+(q[0]-p[0])*t,p[1]+(q[1]-p[1])*t]);}
+  }
+ }
+ return out;
+}
+const roadChunks=[];
+
+const terrainChunks=[];
+for(let tz=WORLD_BOUNDS.minZ;tz<WORLD_BOUNDS.maxZ;tz+=64)for(let tx=WORLD_BOUNDS.minX;tx<WORLD_BOUNDS.maxX;tx+=64){
+ // Preserve two-metre detail in the original island, with a light eight-metre distant mesh.
+ const step=tx>=-64&&tx<64&&tz>=-128?2:8;
+ const tileRoads=roadSegments.filter(r=>r.maxX>=tx&&r.minX<=tx+64&&r.maxZ>=tz&&r.minZ<=tz+64);
+ for(let z=tz;z<tz+64;z+=step)for(let x=tx;x<tx+64;x+=step){
+  const a=[x,height(x,z),z],b=[x+step,height(x+step,z),z],c=[x+step,height(x+step,z+step),z+step],d=[x,height(x,z+step),z+step];
+  if(Math.max(a[1],b[1],c[1],d[1])<-.2)continue;
+  tri(a,d,b,terrainColor(x+step/3,z+step/3));tri(b,d,c,terrainColor(x+step*.66,z+step*.66));
+ }
+ if(data.length)terrainChunks.push({...batch(),x:tx+32,z:tz+32,r:46});
+ for(let z=tz;z<tz+64;z+=step)for(let x=tx;x<tx+64;x+=step)for(const road of tileRoads){
+  if(road.maxX<x||road.minX>x+step||road.maxZ<z||road.minZ>z+step)continue;
+  for(const triangle of [[[x,z],[x+step,z],[x,z+step]],[[x+step,z],[x+step,z+step],[x,z+step]]]){
+   const p=clipRoad(road.polygon,triangle),point=a=>[a[0],height(a[0],a[1])+.015,a[1]];
+   for(let i=1;i<p.length-1;i++)tri(point(p[0]),point(p[i]),point(p[i+1]),hex('d5cbb1'));
+  }
+ }
+ if(data.length)roadChunks.push({...batch(),x:tx+32,z:tz+32,r:46});
+}
+const terrain={count:terrainChunks.reduce((n,b)=>n+b.count,0)};
 // Low islands soften the horizon around the miniature inland sea.
-for(let i=0;i<19;i++){const a=i/19*Math.PI*2,r=rnd(170,260);sphere(Math.cos(a)*r,-3,Math.sin(a)*r,rnd(15,38),rnd(7,15),rnd(12,28),hex(i%2?'aebfba':'b5c4be'),12,5);}
+for(let i=0;i<19;i++){const a=i/19*Math.PI*2,r=rnd(1650,2300);sphere(Math.cos(a)*r,-8,Math.sin(a)*r,rnd(90,240),rnd(25,80),rnd(70,180),hex(i%2?'aebfba':'b5c4be'),12,5);}
 const distant=batch();
 const obstacles=[],steppingStones=[];
 function rock(x,z,s){let y=height(x,z);sphere(x,y+s*.23,z,s,s*.55,s*.72,pal.stone,7,4);if(s>.7&&y>.3)obstacles.push([x,z,s*.6]);}
@@ -84,14 +149,79 @@ for(const x of [3.2,4.6,6]){const y=height(x,-105);branch([x,y,-105],[x,y+4,-105
 box(9,height(9,-103)+.4,-103,2.5,.15,.65,pal.bark);for(const x of [8.1,9.9])box(x,height(x,-103),-103,.15,.45,.5,pal.stone);
 for(const x of [8.1,9,9.9])obstacles.push([x,-103,.4]);
 lantern(3,-96);signpost(-2,-86);sceneryBatch(0,-88,78);
+// Broad landscapes beyond the first cape. Each district has its own culled buffer.
+function quietTree(x,z,s=1,tint=pal.olive){
+ const y=height(x,z);cone(x,y,z,.16*s,.09*s,3.1*s,pal.bark,5);
+ sphere(x,y+3.3*s,z,1.45*s,.85*s,1.25*s,tint,7,4);
+ sphere(x+.7*s,y+3.6*s,z-.5*s,.95*s,.65*s,.9*s,tint,6,3);
+ obstacles.push([x,z,.24*s]);
+}
+function shoreHouse(x,z,w=6){
+ const y=height(x,z),h=w*.65;box(x,y,z,w,h,w*.8,hex('d0c9b4'));
+ const ridge=y+h+w*.27;quad([x-w*.6,y+h,z-w*.5],[x+w*.6,y+h,z-w*.5],[x+w*.6,ridge,z],[x-w*.6,ridge,z],hex('879995'));
+ quad([x-w*.6,ridge,z],[x+w*.6,ridge,z],[x+w*.6,y+h,z+w*.5],[x-w*.6,y+h,z+w*.5],hex('96a69e'));
+ box(x,y+.5,z+w*.405,w*.22,h*.65,.06,pal.bark);
+ for(const a of [-.3,.3])box(x+a*w,y+h*.56,z+w*.41,w*.15,h*.25,.08,pal.blue);
+ // Several overlapping circles follow the footprint without putting invisible walls in the street.
+ for(const dx of [-.3,0,.3])for(const dz of [-.22,.22])obstacles.push([x+dx*w,z+dz*w,w*.22]);
+}
+for(const [x,z] of [[-20,-145],[-2,-192],[-109,-224],[-245,-273],[-270,-416],[-223,-489],[-127,-559],[-111,-675],[-69,-777],[9,-815],[217,-632],[302,-510],[279,-391],[166,-291],[64,-222]])if(distanceToRoute(x,z)>3.5)signpost(x,z);
+sceneryBatch(-30,-165,80);
+// Grove clusters leave long stretches open so the sea and monuments remain useful bearings.
+for(const [gx,gz,tint] of [[-90,-200,pal.olive],[-170,-265,pal.olive],[-310,-390,pal.purple],[-185,-470,pal.olive],[-140,-620,pal.olive],[-120,-750,pal.blue],[85,-690,pal.olive],[240,-600,pal.olive],[280,-450,pal.olive],[145,-270,pal.purple]]){
+ for(let i=0;i<36;i++){const x=gx+rnd(-42,42),z=gz+rnd(-36,36);if(height(x,z)>2.8&&distanceToRoute(x,z)>9)quietTree(x,z,rnd(1.1,2.4),i%5?tint:pal.pink);}
+ for(let i=0;i<8;i++){const x=gx+rnd(-40,40),z=gz+rnd(-35,35),y=height(x,z);if(y<2||distanceToRoute(x,z)<7)continue;const h=rnd(.6,1.3);cone(x,y,z,.15,.1,h,pal.cream,5);sphere(x,y+h,z,.55,.2,.55,pal.pink,7,3);}
+ sceneryBatch(gx,gz,70);
+}
+// A hillside harbour town with a long sea-facing lane and pale tiled roofs.
+for(const [x,z,w] of [[-323,-312,7],[-329,-326,6],[-327,-343,7],[-296,-322,6],[-293,-338,7],[-298,-354,6],[-337,-350,5],[-334,-366,6]])if(distanceToRoute(x,z)>7)shoreHouse(x,z,w);
+for(let i=0;i<26;i++){const x=-349+i*.8,z=-351,y=height(x,z);box(x,y-.05,z,.75,.16,2.2,pal.stone);}
+lantern(-317,-327);lantern(-300,-345);sceneryBatch(-319,-341,64);
+// Dark, layered rock walls follow a dry, gently graded floor through the gorge.
+for(let i=0;i<18;i++){const z=-296-i*14,centre=.15*(z+400);for(const sign of [-1,1]){const x=centre+sign*rnd(35,48);if(distanceToRoute(x,z)<9)continue;const y=height(x,z),h=rnd(8,18),r=rnd(3,6);for(let j=0;j<3;j++)cone(x,y+j*h/3,z,r*(1-j*.14),r*(.9-j*.14),h/3,hex(j%2?'9da8a0':'b3b6a7'),7);obstacles.push([x,z,r*.7]);}}
+for(const p of [[23,-326],[-7,-410],[-25,-508]])lantern(...p);
+sceneryBatch(0,-425,180);
+// Terraced rice paddies and olive rows, with generous gaps where the walking path crosses.
+for(let row=0;row<7;row++){const z=-462-row*14;for(let x=-278;x<-168;x+=4){if(distanceToRoute(x,z)<8||height(x,z)<3)continue;const y=height(x,z);box(x,y-.15,z,3.8,.5,1.1,hex('aab5a1'));for(let j=0;j<3;j++){const zz=z-3-j*2,yy=height(x,zz);tri([x-.13,yy,zz],[x,yy+.65,zz],[x+.13,yy,zz],hex('b4bf9d'));}}}
+for(const x of [-273,-175])for(const z of [-477,-519,-547])if(height(x,z)>3&&distanceToRoute(x,z)>8)quietTree(x,z,1.8);
+shoreHouse(-252,-551,7);sceneryBatch(-224,-511,95);
+// White quarry walls, stepped away from the traversable lane.
+for(let i=0;i<5;i++){const x=352+i*6,z=-515-i*12,y=height(x,z);box(x,y-.3,z,13,7+i*1.6,16,hex(i%2?'c5c7b8':'d6d0bc'));}
+for(const [x,z] of [[300,-548],[293,-530],[328,-493]])rock(x,z,2.5);
+sceneryBatch(345,-541,80);
+// Five monumental, walk-around geometries. Their ground-level openings remain passable.
+for(const m of monuments){const {x,z,size:r,kind}=m,y=height(x,z);
+ if(kind==='ring'){
+  torus(x,y+r+5,z,r,1.1,pal.cream,true);
+  for(const a of [-1,1]){const px=x+a*r*.77;branch([px,height(px,z),z],[px,y+14,z],.65,pal.stone);obstacles.push([px,z,1]);}
+  for(let i=0;i<5;i++){const a=i*Math.PI/2.5;sphere(x+Math.cos(a)*r,y+r+5+Math.sin(a)*r,z,1.35,1.35,1.35,pal.blue,8,5);}
+ }else if(kind==='pyramid'){
+  const apex=[x,y+46,z],corners=[[-r,-r],[r,-r],[r,r],[-r,r]];
+  for(let i=0;i<4;i++){const [a,b]=corners[i],[c,d]=corners[(i+1)%4],base=[x+a,height(x+a,z+b),z+b],next=[x+c,height(x+c,z+d),z+d];branch(base,apex,.85,pal.cream);branch(base,next,.65,pal.stone);obstacles.push([x+a,z+b,1.2]);}
+  // An inner floating diamond marks the middle without enclosing the player.
+  for(let i=0;i<4;i++){const a=i*Math.PI/2,b=(i+1)*Math.PI/2;tri([x,y+26,z],[x+Math.cos(a)*7,y+18,z+Math.sin(a)*7],[x+Math.cos(b)*7,y+18,z+Math.sin(b)*7],i%2?pal.blue:pal.pink);}
+ }else if(kind==='sphere'){
+  sphere(x,y+34,z,r,r,r,pal.blue,24,14);torus(x,y+34,z,r+1,.45,pal.cream,true);torus(x,y+34,z,r+2,.4,pal.cream);
+  for(const sign of [-1,1]){const px=x+sign*19;branch([px,height(px,z),z],[px,y+34,z],.65,pal.stone);branch([px,y+34,z],[x,y+34,z],.4,pal.cream);obstacles.push([px,z,1]);}
+ }else if(kind==='cube'){
+  box(x,y+17,z,r,r,r,hex('c5b5c9'));
+  for(const a of [-1,1])for(const b of [-1,1]){const px=x+a*(r/2+1),pz=z+b*(r/2+1);branch([px,height(px,pz),pz],[px,y+42,pz],.45,pal.stone);obstacles.push([px,pz,.8]);}
+  for(const level of [y+16,y+41]){box(x,level,z-r/2-1,r+3,.5,.5,pal.cream);box(x,level,z+r/2+1,r+3,.5,.5,pal.cream);box(x-r/2-1,level,z,.5,.5,r+3,pal.cream);box(x+r/2+1,level,z,.5,.5,r+3,pal.cream);}
+ }else if(kind==='spiral'){
+  for(const phase of [0,Math.PI]){let last=null;for(let i=0;i<=64;i++){const t=i/64,a=t*Math.PI*3+phase,p=[x+Math.cos(a)*12,y+6+t*34,z+Math.sin(a)*12];if(last)branch(last,p,.8,phase?pal.pink:pal.blue);last=p;}}
+  for(const sign of [-1,1]){const px=x+sign*17;branch([px,height(px,z),z],[px,y+40,z],.4,pal.cream);obstacles.push([px,z,.7]);}
+ }
+ sceneryBatch(x,z,Math.max(70,r*2));
+}
+
 // Water is an actual surface: walking remains on dry land.
-for(let z=-350;z<350;z+=10)for(let x=-350;x<350;x+=10)quad([x,0,z],[x,0,z+10],[x+10,0,z+10],[x+10,0,z],hex('a5c2be'));
+for(let z=-2700;z<2700;z+=90)for(let x=-2700;x<2700;x+=90)quad([x,0,z],[x,0,z+90],[x+90,0,z+90],[x+90,0,z],hex('a5c2be'));
 const sea=batch();
 // Threadlike shoreline ripples. Their low contrast keeps the sea calm.
 for(let i=0;i<110;i++){const a=i/110*Math.PI*2,r=1.015,x=Math.cos(a)*35*r,z=Math.sin(a)*39*r;if(height(x,z)>.2)continue;const dx=-Math.sin(a)*rnd(.5,1.8),dz=Math.cos(a)*rnd(.5,1.8);quad([x-dx,.045,z-dz],[x-dx+.08,.045,z-dz+.08],[x+dx+.08,.045,z+dz+.08],[x+dx,.045,z+dz],hex('cedad0'));}
 const foam=batch();
 // Soft, low clouds hang over the distant islands.
-for(let i=0;i<13;i++){const a=i/13*Math.PI*2,r=rnd(120,190),x=Math.cos(a)*r,z=Math.sin(a)*r,y=rnd(24,36);for(let j=0;j<3;j++)sphere(x+j*8,y+j*.8,z,13,2.4,5,hex('d4dbd2'),9,5);}
+for(let i=0;i<13;i++){const a=i/13*Math.PI*2,r=rnd(950,1600),x=Math.cos(a)*r,z=Math.sin(a)*r,y=rnd(160,230);for(let j=0;j<3;j++)sphere(x+j*45,y+j*3,z,75,12,30,hex('d4dbd2'),9,5);}
 const clouds=batch();
 const npcs=[];
 function islander(x,z,name,lines,tint){
@@ -111,13 +241,37 @@ islander(-24,22,'潮待ちのひと',['道が見えるうちは、向こうま�
 islander(-39,-58,'傘を数えるひと',['よく、ここまで。森は、雨のない日にも傘をさす。','道をぐるりと辿れば、風の畑に出られます。'], 'b9a6bc');
 islander(39,-67,'風を編むひと',['葉の裏まで、海の色でしょう。','畑の先を右へ。硝子のような入江があります。'], 'b7b999');
 islander(3,-101,'岬のひと',['ここからなら、来た道まで海のなか。','また、あの浜で会いましょう。'], 'a9b6bd');
+islander(-307,-338,'港のひと',['ようこそ、凪見へ。屋根の向こうまで、潮の匂いです。','丘の輪が見えたら、来た道がわかります。'], 'a6b4b1');
+islander(3,-392,'石を聴くひと',['この谷には、海より古い音が残っています。','岩の間を抜けると、ひかりの棚田です。'], 'b9b4a4');
+islander(-123,-582,'空を測るひと',['空っぽのまま、空を支えているのです。','あちらの天球は、夜を待っています。'], 'b4a7bd');
+islander(312,-522,'白い石のひと',['石を切るたびに、別の空が見つかりました。','あの四角い影も、いつか海へ帰るのでしょう。'], 'c7bcb1');
 const CAMERA_FOV=68,RUN_SPEED=7.8,GREETING_RADIUS=4.8;
 const player={x:8,z:30,y:height(8,30)+1.65,yaw:.25,yawRate:0,localForward:0,localSide:0,vx:0,vz:0};
+const camera={x:player.x,y:player.y,z:player.z,yaw:player.yaw};
+let previous={...camera},accumulator=0;
+function resetCameraHistory(){Object.assign(camera,{x:player.x,y:player.y,z:player.z,yaw:player.yaw});previous={...camera};accumulator=0;}
+
+let actualSpeed=0,blockedFor=0;
 let started=false,time=0,last=performance.now(),held=false,pointer={x:0,y:0},pointerOrigin=null,pointerId=null,activeTouches=new Set(),multiTouchBlocked=false,keys=new Set(),greetUntil=0,placeUntil=0,shownPlaces=new Set(),lastGreetingDistance=null;
-function resize(){const d=Math.min(devicePixelRatio||1,1.7),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}addEventListener('resize',resize);resize();
-function vp(){const f=1/Math.tan(CAMERA_FOV*Math.PI/360),aspect=canvas.width/canvas.height,n=.08,far=520,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(player.yaw),s=Math.sin(player.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*player.x+s*player.z,-player.y,-s*player.x-c*player.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
-function draw(b,offset=[0,0,0],yaw=0,water=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);}
-function render(){gl.disable(gl.DEPTH_TEST);gl.useProgram(skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);const a=gl.getAttribLocation(skyProg,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);gl.uniform1f(gl.getUniformLocation(skyProg,'yaw'),player.yaw);gl.uniform1f(gl.getUniformLocation(skyProg,'aspect'),canvas.width/canvas.height);gl.drawArrays(gl.TRIANGLES,0,3);gl.enable(gl.DEPTH_TEST);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(prog);gl.uniformMatrix4fv(loc.uVP,false,vp());gl.uniform3f(loc.uEye,player.x,player.y,player.z);gl.uniform1f(loc.uTime,reduced?0:time);draw(distant);draw(sea,[0,0,0],0,1);draw(terrain);draw(foam);draw(world);for(const chunk of scenery){const dx=chunk.x-player.x,dz=chunk.z-player.z,d=Math.hypot(dx,dz);if(d<125+chunk.r&&(-dx*Math.sin(player.yaw)-dz*Math.cos(player.yaw)>-chunk.r||d<chunk.r))draw(chunk);}draw(clouds);for(const npc of npcs){const target=Math.atan2(player.x-npc.x,player.z-npc.z);let diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));npc.angle+=diff*.018;draw(npc.mesh,[npc.x,npc.y+(reduced?0:Math.sin(time*.75+npc.x)*.013),npc.z],npc.angle);}}
+function resize(){const d=Math.min(devicePixelRatio||1,1.5),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}addEventListener('resize',resize);resize();
+function vp(){const f=1/Math.tan(CAMERA_FOV*Math.PI/360),aspect=canvas.width/canvas.height,n=.18,far=2600,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*camera.x+s*camera.z,-camera.y,-s*camera.x-c*camera.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
+let drawnVertices=0,drawCalls=0;
+function draw(b,offset=[0,0,0],yaw=0,water=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);drawnVertices+=b.count;drawCalls++;}
+function visible(b,range=1450){
+ const dx=b.x-camera.x,dz=b.z-camera.z,d=Math.hypot(dx,dz);if(d>=range+b.r)return false;if(d<b.r)return true;
+ const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),forward=-dx*s-dz*c,side=dx*c-dz*s,tangent=Math.tan(CAMERA_FOV*Math.PI/360)*canvas.width/canvas.height;
+ return forward>-b.r&&Math.abs(side)<=Math.max(0,forward)*tangent+b.r*Math.hypot(1,tangent);
+}
+function render(){
+ drawnVertices=0;drawCalls=0;gl.disable(gl.DEPTH_TEST);gl.useProgram(skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);const a=gl.getAttribLocation(skyProg,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
+ gl.uniform1f(skyLoc.yaw,camera.yaw);gl.uniform1f(skyLoc.aspect,canvas.width/canvas.height);gl.uniform1f(skyLoc.tanHalfFov,Math.tan(CAMERA_FOV*Math.PI/360));gl.uniform3fv(skyLoc.moonDirection,MOON_DIRECTION);gl.drawArrays(gl.TRIANGLES,0,3);
+ gl.enable(gl.DEPTH_TEST);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(prog);gl.uniformMatrix4fv(loc.uVP,false,vp());gl.uniform3f(loc.uEye,camera.x,camera.y,camera.z);gl.uniform1f(loc.uTime,reduced?0:time);
+ draw(distant);draw(sea,[0,0,0],0,1);for(const chunk of terrainChunks)if(visible(chunk))draw(chunk);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-1,-1);for(const chunk of roadChunks)if(visible(chunk))draw(chunk);gl.disable(gl.POLYGON_OFFSET_FILL);draw(foam);
+ if(visible({x:0,z:-25,r:100},650))draw(world);
+ for(const chunk of scenery)if(visible(chunk))draw(chunk);draw(clouds);
+ for(const npc of npcs){if(!visible({...npc,r:2},420))continue;draw(npc.mesh,[npc.x,npc.y,npc.z],npc.angle);}
+}
+
 function update(dt){
  let forward=0,strafe=0,turn=0;
  if(held){const i=pointerInput(pointer.x,pointer.y);forward=i.forward;strafe=i.strafe;turn=i.turn;}
@@ -126,27 +280,36 @@ function update(dt){
  turn+=(keys.has('ArrowRight')||keys.has('KeyE')?1:0)-(keys.has('ArrowLeft')||keys.has('KeyQ')?1:0);
  // Steering is independent of throttle: a diagonal thumb stroke describes a curve, not a sideways slide.
  const len=Math.max(1,Math.hypot(forward,strafe));forward/=len;strafe/=len;
- const desiredYaw=clamp(turn,-1,1)*1.8;
- if(!turn)player.yawRate=0;else player.yawRate+=(desiredYaw-player.yawRate)*(1-Math.exp(-dt*20));
+ player.yawRate=turnVelocity(player.yawRate,turn,Math.abs(player.localForward),dt);
  player.yaw-=player.yawRate*dt;
  const boost=keys.has('ShiftLeft')||keys.has('ShiftRight')?1.12:1;
  const ahead=forward*(forward>=0?RUN_SPEED:5.4)*boost,side=strafe*5.8*boost;
- const response=1-Math.exp(-dt*22);
+ const response=1-Math.exp(-dt*9);
  if(!forward&&!strafe){player.localForward=player.localSide=0;}
- else{player.localForward+=(ahead-player.localForward)*response;player.localSide+=(side-player.localSide)*response;}
+ else{if(ahead*player.localForward<0)player.localForward=0;player.localForward+=(ahead-player.localForward)*response;player.localSide+=(side-player.localSide)*response;}
  // Velocity rotates with the camera immediately, so steering does not leave an old sideways drift.
  const c=Math.cos(player.yaw),s=Math.sin(player.yaw);
  player.vx=player.localSide*c-player.localForward*s;player.vz=-player.localForward*c-player.localSide*s;
  const oldX=player.x,oldZ=player.z,next=moveOnIsland(player.x,player.z,player.vx*dt,player.vz*dt,obstacles);
  player.x=next.x;player.z=next.z;
- updateFootsteps(Math.hypot(player.x-oldX,player.z-oldZ),dt);
- const floor=height(player.x,player.z)+1.65;player.y+=(floor-player.y)*(1-Math.exp(-dt*10));
+ const travelled=Math.hypot(player.x-oldX,player.z-oldZ);actualSpeed=travelled/dt;
+ blockedFor=Math.hypot(player.vx,player.vz)>.1&&actualSpeed<.03?blockedFor+dt:0;
+ updateFootsteps(travelled,dt);
+ player.y=height(player.x,player.z)+1.65;
+ for(const npc of npcs){const target=Math.atan2(player.x-npc.x,player.z-npc.z),diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));npc.angle+=diff*(1-Math.exp(-dt*1.5));}
  for(const npc of npcs){const dist=Math.hypot(player.x-npc.x,player.z-npc.z);if(dist<GREETING_RADIUS&&time-npc.last>23&&time>greetUntil+1){lastGreetingDistance=dist;npc.last=time;document.querySelector('#speaker').textContent=npc.name;document.querySelector('#words').textContent=npc.lines[npc.index%npc.lines.length];npc.index++;document.querySelector('#greeting').style.opacity=1;greetUntil=time+7;chime();break;}}
  if(time>greetUntil)document.querySelector('#greeting').style.opacity=0;
  for(const [name,en,x,z,r] of landmarks)if(!shownPlaces.has(name)&&Math.hypot(player.x-x,player.z-z)<r&&time>placeUntil-2.2){shownPlaces.add(name);document.querySelector('#place-jp').textContent=name;document.querySelector('#place-en').textContent=en;document.querySelector('#place').style.opacity=1;placeUntil=time+4;break;}
  if(time>placeUntil)document.querySelector('#place').style.opacity=0;
 }
-function frame(now){const dt=Math.min((now-last)/1000,.1);last=now;time+=dt;if(started){let remaining=dt;while(remaining>0){const step=Math.min(.025,remaining);update(step);remaining-=step;}}render();requestAnimationFrame(frame);}requestAnimationFrame(frame);
+function frame(now){
+ const dt=clamp((now-last)/1000,0,1/15);last=now;
+ if(started){accumulator+=dt;const step=1/60;while(accumulator>=step){previous={x:player.x,y:player.y,z:player.z,yaw:player.yaw};time+=step;update(step);accumulator-=step;}
+  const alpha=accumulator/step;for(const k of ['x','y','z','yaw'])camera[k]=previous[k]+(player[k]-previous[k])*alpha;
+ }else{time+=dt;resetCameraHistory();}
+ render();requestAnimationFrame(frame);
+}requestAnimationFrame(frame);
+
 function setPointer(e){
  if(!pointerOrigin)return;
  const r=canvas.getBoundingClientRect(),radius=clamp(Math.min(r.width,r.height)*.19,64,96);
@@ -174,7 +337,7 @@ canvas.addEventListener('pointermove',e=>{if(e.pointerId===pointerId){e.preventD
 function release(e){
  if(e&&e.pointerId!==pointerId)return;
  const previous=pointerId;held=false;pointerId=null;pointerOrigin=null;pointer.x=pointer.y=0;
- player.vx=player.vz=player.localForward=player.localSide=player.yawRate=0;footDistance=0;feetMoving=false;
+ player.vx=player.vz=player.localForward=player.localSide=player.yawRate=0;resetCameraHistory();actualSpeed=blockedFor=0;footDistance=0;feetMoving=false;
  if(previous!==null&&canvas.hasPointerCapture(previous))canvas.releasePointerCapture(previous);
 }
 function finishPointer(e){if(e.pointerType==='touch'){activeTouches.delete(e.pointerId);if(!activeTouches.size)multiTouchBlocked=false;}release(e);}
@@ -243,7 +406,7 @@ function updateFootsteps(distance,dt){
  if(footDistance>=stride){footDistance%=stride;footstep(surfaceAt(player.x,player.z),speed);}
 }
 function chime(){if(!audioCtx||audioCtx.state!=='running')return;for(const [i,f] of [523.25,783.99].entries()){const o=audioCtx.createOscillator(),g=audioCtx.createGain(),t=audioCtx.currentTime+i*.15;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.035,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+2);o.connect(g);g.connect(master);o.start(t);o.stop(t+2);}}
-function begin(){if(started)return;started=true;greetUntil=time-1;placeUntil=time-2;document.body.classList.add('playing');canvas.focus();audio();document.querySelector('#hint').textContent='一本指で、上は前進・左右は旋回。';document.querySelector('#hint').style.opacity=1;setTimeout(()=>document.querySelector('#hint').style.opacity=0,4500);}
+function begin(){if(started)return;started=true;greetUntil=time-1;placeUntil=time-2;document.body.classList.add('playing');canvas.focus();audio();document.querySelector('#hint').textContent='指を少し上へ。そのままで歩き続けます。';document.querySelector('#hint').style.opacity=1;setTimeout(()=>document.querySelector('#hint').style.opacity=0,4500);}
 const beginButton=document.querySelector('#begin');beginButton.addEventListener('click',begin);beginButton.disabled=false;beginButton.removeAttribute('aria-busy');
 // Minimal diagnostic state for development; no interface is added during play.
-window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+world.count+sea.count+scenery.reduce((n,b)=>n+b.count,0)},get places(){return [...shownPlaces]},get islanders(){return npcs.length},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};
+window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get camera(){return{...camera}},get turningRate(){return player.yawRate},get actualSpeed(){return actualSpeed},get blockedFor(){return blockedFor},get monuments(){return monuments.length},get renderedVertices(){return drawnVertices},get drawCalls(){return drawCalls},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+roadChunks.reduce((n,b)=>n+b.count,0)+world.count+sea.count+scenery.reduce((n,b)=>n+b.count,0)},get places(){return [...shownPlaces]},get islanders(){return npcs.length},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};

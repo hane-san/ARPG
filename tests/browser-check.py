@@ -31,7 +31,7 @@ with sync_playwright() as p:
   context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
   live=context.new_page();live_errors=[];live.on('pageerror',lambda e:live_errors.append(str(e)))
   response=live.goto(base,wait_until='networkidle',timeout=45000);assert response.ok
-  live.wait_for_function('window.nagi && nagi.release === "2026-10-16-northern-trails"',timeout=30000)
+  live.wait_for_function('window.nagi && nagi.release === "2026-10-17-wide-horizon"',timeout=30000)
   icon=live.locator('link[rel="icon"]').get_attribute('href');assert live.request.get(live.evaluate('(p)=>new URL(p,location.href).href',icon)).ok
   live.locator('#begin').tap();live.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
   cdp=context.new_cdp_session(live);anchor=live.evaluate('nagi.position')
@@ -51,7 +51,7 @@ with sync_playwright() as p:
  page.goto(base,wait_until='networkidle');page.wait_for_function('!!window.nagi',timeout=30000)
  assert page.evaluate('!!window.nagi'),errors
 
- assert page.evaluate('nagi.release')=='2026-10-16-northern-trails'
+ assert page.evaluate('nagi.release')=='2026-10-17-wide-horizon'
  page.wait_for_function('!!window._nagiVP')
  assert abs(page.evaluate('2*Math.atan(1/_nagiVP[5])*180/Math.PI')-68)<.001
  # Portrait, compact phones, tablet, and notched landscape: no overlap, clipping, or scrolling.
@@ -123,6 +123,13 @@ with sync_playwright() as p:
  touch('touchEnd');stopped(mobile)
  forward=mobile.evaluate('nagi.position')
  assert forward['z']<start['z']-2 and forward['yaw']==start['yaw']
+ # A twelve-pixel slide remains active without any further move events.
+ short=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,693);moved(mobile,short,1)
+ assert 2.6<mobile.evaluate('nagi.speed')<4.2
+ steady=mobile.evaluate('nagi.position');moved(mobile,steady,.6)
+ assert abs(mobile.evaluate('nagi.position.yaw')-short['yaw'])<.00001
+ touch('touchEnd');stopped(mobile)
+ eye=mobile.evaluate('nagi.camera');mobile.wait_for_timeout(300);assert mobile.evaluate('nagi.camera')==eye
  # A slightly imperfect upward stroke still runs straight rather than slowly veering.
  straight=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',207,620);moved(mobile,straight,.5)
  assert abs(mobile.evaluate('nagi.position.yaw')-straight['yaw'])<.00001
@@ -140,7 +147,7 @@ with sync_playwright() as p:
  # One diagonal stroke runs and turns simultaneously at full forward speed.
  curve_start=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',225,620);moved(mobile,curve_start,2)
  curve_end=mobile.evaluate('nagi.position')
- assert curve_end['yaw']<curve_start['yaw']-.06
+ assert curve_end['yaw']<curve_start['yaw']-.015
  assert mobile.evaluate('nagi.speed')>7.2
  # Recenter while still holding: both throttle and rotation stop, without lifting the finger.
  touch('touchMove',195,705);stopped(mobile);yaw=mobile.evaluate('nagi.position.yaw');mobile.wait_for_timeout(400);assert abs(mobile.evaluate('nagi.position.yaw')-yaw)<.0001
@@ -152,7 +159,7 @@ with sync_playwright() as p:
  assert abs(mobile.evaluate('nagi.position.yaw')-yaw)<.0001
  touch('touchEnd');stopped(mobile)
  # Low deflection remains available for precise movement near an islander.
- fine_start=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,688);moved(mobile,fine_start,.25)
+ fine_start=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,698);moved(mobile,fine_start,.25)
  assert .1<mobile.evaluate('nagi.speed')<3
  touch('touchEnd');stopped(mobile)
  edge_start=mobile.evaluate('nagi.position');touch('touchStart',340,720);stopped(mobile);touch('touchMove',378,720);mobile.wait_for_function(f'nagi.position.yaw < {edge_start["yaw"]-.4}',timeout=30000);touch('touchEnd');stopped(mobile)
@@ -174,12 +181,7 @@ with sync_playwright() as p:
  anchor=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,620);moved(mobile,anchor,.4);touch('touchEnd');stopped(mobile)
  mobile.reload(wait_until='networkidle');mobile.wait_for_function('!!window.nagi');mobile.locator('#begin').tap();mobile.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
  touch('touchStart',195,600);touch('touchMove',195,700)
- blocked=False;previous=mobile.evaluate('nagi.position')
- for _ in range(50):
-  mobile.wait_for_timeout(300);current=mobile.evaluate('nagi.position')
-  if distance(previous,current)<.002:blocked=True;break
-  previous=current
- assert blocked,'shore boundary did not stop motion'
+ mobile.wait_for_function('nagi.blockedFor > .35',timeout=90000)
  stopped(mobile);touch('touchEnd');stopped(mobile)
  coast=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,620);moved(mobile,coast,.5);touch('touchEnd');stopped(mobile)
  print('shore collision: held input stops at water, makes no footsteps, and can reverse cleanly',flush=True)

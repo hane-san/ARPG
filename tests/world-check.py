@@ -16,7 +16,7 @@ window._qa={
    if(stuck>15||steps>16000){keys.clear();throw Error('Blocked en route to '+[x,z]+' at '+[player.x,player.z]);}
   }}keys.clear();update(1/60);return {steps,position:{...player}};
  },
- view(yaw){player.yaw=yaw;render();},routes,landmarks,
+ view(yaw){player.yaw=yaw;resetCameraHistory();render();},routes,landmarks,
  clearance(){let closest=Infinity,at=null;for(const route of routes)for(let i=1;i<route.length;i++){
   const [ax,az]=route[i-1],[bx,bz]=route[i],len=Math.hypot(bx-ax,bz-az);
   for(let t=0;t<=1;t+=.25/len)for(const [x,z,r] of obstacles){const d=Math.hypot(ax+(bx-ax)*t-x,az+(bz-az)*t-z)-r-.23;if(d<closest){closest=d;at=[x,z];}}
@@ -31,8 +31,9 @@ with sync_playwright() as p:
  page.route('**/island.js?*',lambda route:route.fulfill(status=200,content_type='application/javascript',body=source))
  page.goto('http://127.0.0.1:4174/',wait_until='networkidle');page.wait_for_function('!!window._qa');page.locator('#begin').click()
  page.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
- assert page.evaluate('nagi.worldVertices')<550000
- assert page.evaluate('nagi.islanders')==7
+ assert page.evaluate('nagi.worldVertices')<900000
+ assert page.evaluate('nagi.islanders')==11
+ assert page.evaluate('nagi.monuments')==5
  clearance=page.evaluate('_qa.clearance()');assert clearance['closest']>.15,clearance
  print('route obstacle clearance:',clearance,'vertices:',page.evaluate('nagi.worldVertices'),flush=True)
  legs=[('umbrella-grove',[[5,22],[0,12],[-3,1],[-9,-6],[-10,-18],[-10,-27],[-10,-34],[-23,-44],[-36,-57]],-.1),
@@ -40,13 +41,23 @@ with sync_playwright() as p:
        ('headland',[[0,-85],[6,-100]],0),
        ('olive-terraces',[[12,-91],[20,-83],[36,-65]],-1.3),
        ('glass-cove',[[19,-57],[29,-55]],-2.1),
+       ('wind-ring-approach',[[19,-57],[36,-65],[20,-83],[12,-91],[6,-100],[10,-112],[-10,-137],[-25,-165],[0,-195],[-40,-214]],1.126),
+       ('wind-ring',[[-105,-245]],.05),
+       ('harbour-town',[[-245,-285],[-310,-335]],1.4),
+       ('rice-terraces',[[-265,-425],[-225,-510]],.9),
+       ('open-pyramid',[[-120,-580]],.2),
+       ('celestial-sphere',[[-110,-690],[-70,-795],[0,-840]],0),
+       ('white-quarry',[[95,-730],[220,-650],[315,-525]],-1),
+       ('spiral-garden',[[290,-400],[175,-305]],0),
+       ('layered-gorge',[[65,-240],[0,-195],[-105,-245],[20,-310],[0,-390]],.1),
+       ('gorge-return',[[-15,-490],[-35,-570],[-120,-580],[-35,-570],[-15,-490],[0,-390],[20,-310],[-105,-245],[0,-195],[-25,-165],[-10,-137],[10,-112],[6,-100],[12,-91],[20,-83],[36,-65],[19,-57]],0),
        ('return-shrine',[[19,-57],[8,-40],[-10,-34],[-10,-27],[-10,-18],[-9,-6],[-3,1],[0,12],[5,22],[8,30]],.25)]
  for name,points,yaw in legs:
   result=page.evaluate('(points)=>_qa.walk(points)',points)
   page.evaluate('(yaw)=>_qa.view(yaw)',yaw);page.wait_for_timeout(400)
   page.screenshot(path=str(root/(name+'.png')))
-  print(name,json.dumps(result['position']),flush=True)
- assert {'薄紫の傘の森','風を待つ段々畑','硝子の入江','空に近い岬','花の尾根道'}.issubset(set(page.evaluate('nagi.places')))
+  print(name,json.dumps({'position':result['position'],'drawnVertices':page.evaluate('nagi.renderedVertices'),'drawCalls':page.evaluate('nagi.drawCalls')}),flush=True)
+ assert {'風環の丘','凪見の港町','重ね石の渓谷','ひかりの棚田','空洞のピラミッド','岬の天球','白い石切り場','ねじれの庭','薄紫の傘の森','風を待つ段々畑','硝子の入江','空に近い岬','花の尾根道'}.issubset(set(page.evaluate('nagi.places')))
  assert not errors,errors
- print('whole northern loop + cove spur + return: production movement, collisions, destination triggers and rendering passed',flush=True)
+ print('whole expanded island loop + gorge shortcut + cove spur + return: production movement, collisions, destination triggers and rendering passed',flush=True)
  browser.close()

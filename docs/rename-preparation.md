@@ -41,7 +41,7 @@ GitHubの旧repo URLの転送と、旧PagesのプロジェクトサイトURLは�
 | サービスワーカー | 登録コード・配布ファイルなし | 新しい固定キャッシュを導入しない。OS/ブラウザの表示キャッシュは実機で別確認 |
 | Pages（API確認） | legacy、main / root、旧URL、status=built | 実Rename後に設定・再配信・新URLを確認。配信先をdistへ勝手に変更しない |
 | git remote（取得済み） | origin fetch/pushとも旧Git URL | 今回変更なし。実改名後に各cloneで更新。worktreeはremote設定を共有するため調整 |
-| CI / 基盤PR #4 | GitHubには `Nagi checks` があるがmainにはまだworkflow未配置。基盤PR #4は未マージ | PR検証に必要な同じCI定義とChromium選択だけを引継ぎ、新パス検査とroot生成物の整合チェックを追加 |
+| CI / 基盤PR #4 | GitHubには `Nagi checks` があるがmainにはまだworkflow未配置。基盤PR #4は未マージ | PR検証に必要な同じCI定義とChromium選択を引継ぎ、既存browser-checkの完全回帰へ新旧パス検査を接続。workflowは #4と同一で統合時の競合を避ける |
 | 現在参照と過去資料 | READMEの旧Pagesリンク、基盤PR #4のAGENTS/DEVELOPMENT等のrepo参照、研究記録の旧名 | 実改名後の修復PRで現在参照を更新。過去の判断・URL・SHA・run記録は無差別置換しない |
 | 外部AI・Routine・共有先 | Codex/Claude/ChatGPTの対象repo、Routine、ショートカット等の管理状態は未確認 | 実改名後に人間が対象・権限・ブランチを再確認し、実際のIssue→PR受渡しを試す |
 
@@ -77,7 +77,7 @@ READMEはその小PRで現在の見出しを編集し、研究資料の歴史的
 
 ### 改名前
 
-1. 基盤PR #4の運用資料・main保護を先に確認・統合する。この準備PRのCIは同じ定義を引き継いでいるため、後から統合する側で新パス検査を保持する。
+1. 基盤PR #4の運用資料・main保護を先に確認・統合する。この準備PRのCIは同じ定義を引き継ぎ、新パス検査は既存ブラウザ入口から呼び出す。後から統合する側で検証の接続を保持する。
 2. この準備PRをCI・独立レビュー・人間確認後に統合。リスクmedium。自己検証を独立監査として数えない。
 3. SRPGの実際の移行・新URL・実機確認が安定してからARPGの実Renameへ進む。準備PRは両作品で先に用意できる。
 4. 旧URL、main SHA、package/release、root→dist、開始・一本指移動・停止、ホーム画面の現状を記録する。セーブは未実装なので「進行を復元できた」とは報告しない。

@@ -200,3 +200,6 @@ with sync_playwright() as p:
  print('mobile: lower-half origin, slide to run, backward, steering, release/cancel, and silent idle/turn passed',flush=True)
  print('audio buffer peak/RMS:',json.dumps(stats),flush=True)
  browser.close()
+
+# Keep the project-path rehearsal in the existing full browser entrypoint.
+subprocess.run([sys.executable,str(root/'rename-check.py')],check=True)

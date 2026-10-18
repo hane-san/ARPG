@@ -1,5 +1,5 @@
 """Native touch input drives the production motion core through the full acceleration window."""
-import atexit,json,subprocess,time
+import os,atexit,json,subprocess,time
 from pathlib import Path
 from playwright.sync_api import sync_playwright
 root=Path(__file__).resolve().parents[1]
@@ -15,7 +15,7 @@ window._controlsQA={
 };
 '''
 with sync_playwright() as p:
- browser=p.chromium.launch(executable_path='/usr/bin/chromium',headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
+ browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
  context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True);page=context.new_page();errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
  page.route('**/island.js?*',lambda r:r.fulfill(status=200,content_type='application/javascript',body=(root/'dist/island.js').read_text()+probe))
  page.goto('http://127.0.0.1:4178/',wait_until='networkidle');page.wait_for_function('!!window._controlsQA');page.locator('#begin').tap();page.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')

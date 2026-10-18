@@ -1,6 +1,7 @@
 import {readFile,writeFile,mkdir,copyFile} from 'node:fs/promises';
 import {fileURLToPath} from 'node:url';
 import path from 'node:path';
+import './sync-display-name.mjs';
 const root=path.resolve(path.dirname(fileURLToPath(import.meta.url)),'..'),dist=path.join(root,'dist');
 const read=name=>readFile(path.join(dist,name),'utf8');
 const [html,css,terrain,movement,island]=await Promise.all(['index.html','style.css','terrain.js','movement.js','island.js'].map(read));

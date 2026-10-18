@@ -5,9 +5,10 @@
 
 ## 開発運用の導入・残作業
 
-1. [Issue #3](https://github.com/hane-san/Koitototsukuru/issues/3) の専用PRで契約・文書索引・テンプレート・PR CIを導入。main統合は人間の確認後。
-2. 成功したPR CIのチェック名をmainのRulesetへ登録し、失敗CIのPRがマージを制限されるか確認（未実施）。
+1. [Issue #3](https://github.com/hane-san/Koitototsukuru/issues/3) / PR #4で契約・文書索引・テンプレート・PR CIをmainへ導入済み。統合後CI・Pagesも成功。
+2. 人間がmainのRulesetへ必須チェックを設定し、APIで適用を確認済み。失敗CIのPRがマージを制限される実地テストは未実施。[現在地・根拠](rename-preparation.md#基盤統合後の現在地2026-10-18追記)。
 3. Codex/SonnetのIssue受渡し、リスク別の独立監査と試遊記録を手動で試す。夜間Routineは未設定。
+4. 改名準備PR #6へ最新mainを取り込み、検証結果はPR本文へ記録する。[独立レビュー](rename-review-handoff.md)と人間確認を終えてから統合する。実Renameと表示名切替は別工程。
 
 ## 優先する追加検証
 

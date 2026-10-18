@@ -76,6 +76,7 @@ with sync_playwright() as p:
  assert page.locator('#arrival').evaluate("e=>getComputedStyle(e).visibility")=='hidden'
  before=page.evaluate('nagi.position');initial_steps=page.evaluate('nagi.footsteps')
  page.keyboard.down('w');moved(page,before,3)
+ page.wait_for_function('nagi.speed>13.6',timeout=15000)
  assert page.evaluate('nagi.speed')>13.6
  page.keyboard.up('w');page.wait_for_timeout(300)
  after=page.evaluate('nagi.position')
@@ -118,6 +119,7 @@ with sync_playwright() as p:
  assert distance(start,mobile.evaluate('nagi.position'))<.002
  # Lower-half contact is neutral; an upward slide runs without reaching the top half.
  touch('touchStart',195,705);mobile.wait_for_timeout(1200);stopped(mobile);touch('touchMove',195,620);moved(mobile,start,3)
+ mobile.wait_for_function('nagi.speed>13.6',timeout=15000)
  assert mobile.evaluate('nagi.speed')>13.6
  assert mobile.evaluate('nagi.footsteps')>0 and mobile.evaluate('nagi.audioState')=='running'
  touch('touchEnd');stopped(mobile)
@@ -200,3 +202,6 @@ with sync_playwright() as p:
  print('mobile: lower-half origin, slide to run, backward, steering, release/cancel, and silent idle/turn passed',flush=True)
  print('audio buffer peak/RMS:',json.dumps(stats),flush=True)
  browser.close()
+
+# Keep the project-path rehearsal in the existing full browser entrypoint.
+subprocess.run([sys.executable,str(root/'tests/rename-check.py')],check=True)

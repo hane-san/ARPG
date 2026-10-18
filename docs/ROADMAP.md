@@ -8,7 +8,8 @@
 1. [Issue #3](https://github.com/hane-san/Koitototsukuru/issues/3) / PR #4で契約・文書索引・テンプレート・PR CIをmainへ導入済み。統合後CI・Pagesも成功。
 2. 人間がmainのRulesetへ必須チェックを設定し、APIで適用を確認済み。失敗CIのPRがマージを制限される実地テストは未実施。[現在地・根拠](rename-preparation.md#基盤統合後の現在地2026-10-18追記)。
 3. Codex/SonnetのIssue受渡し、リスク別の独立監査と試遊記録を手動で試す。夜間Routineは未設定。
-4. 改名準備PR #6へ最新mainを取り込み、検証結果はPR本文へ記録する。[独立レビュー](rename-review-handoff.md)と人間確認を終えてから統合する。実Renameと表示名切替は別工程。
+4. 改名準備PR #6は人間が統合済み。GitHub上で独立レビュー記録を確認できないため、[統合後レビュー](rename-review-handoff.md) と実機確認を残す。
+5. repoは `ARPG` へ改名済み。[Issue #7](https://github.com/hane-san/ARPG/issues/7) の修正PRで現在参照と `/ARPG/` の検査を整える。旧 `/Koitototsukuru/` は404。新URLのホーム画面登録と外部AIの対象repoを確認する。
 
 ## 優先する追加検証
 
@@ -19,6 +20,6 @@
 
 ## 別工程・未採用の拡張
 
-- repo/表示名の移行はSRPGの移行安定後に別タスクで実施。現在の公開パスは維持する。
+- 現在のrepoは `hane-san/ARPG`、公開は `https://hane-san.github.io/ARPG/`。追加のrepo改名と表示名切替は別タスクで実施し、残る移行検証を先に終える。
 - 戦闘・クエスト・セーブ・複雑な世界状態は未実装。採用判断と受入条件をIssueへ残してから別PRで扱う。
 - 別作品の統合や、拡張性だけを目的とする大規模な抽象化は本導入に含めない。

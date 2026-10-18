@@ -6,7 +6,7 @@
 ## 開発運用の導入・残作業
 
 1. [Issue #3](https://github.com/hane-san/Koitototsukuru/issues/3) / PR #4で契約・文書索引・テンプレート・PR CIをmainへ導入済み。統合後CI・Pagesも成功。
-2. 人間がmainのRulesetへ必須チェックを設定し、APIで適用を確認済み。失敗CIのPRがマージを制限される実地テストは未実施。[現在地・根拠](rename-preparation.md#基盤統合後の現在地2026-10-18追記)。
+2. 人間がmainのRulesetへ必須チェックを設定し、APIで適用を確認済み。検証専用PR #9でrules=failure / browser=success時のGitHub blockedを実地確認後に閉じ、mainは不変。[現在地・根拠](rename-preparation.md#実際の改名後の現在地2026-10-18追記)。
 3. Codex/SonnetのIssue受渡し、リスク別の独立監査と試遊記録を手動で試す。夜間Routineは未設定。
 4. 改名準備PR #6は人間が統合済み。GitHub上で独立レビュー記録を確認できないため、[統合後レビュー](rename-review-handoff.md) と実機確認を残す。
 5. repoは `ARPG` へ改名済み。[Issue #7](https://github.com/hane-san/ARPG/issues/7) の修正PRで現在参照と `/ARPG/` の検査を整える。旧 `/Koitototsukuru/` は404。新URLのホーム画面登録と外部AIの対象repoを確認する。

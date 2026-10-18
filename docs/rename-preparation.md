@@ -10,7 +10,8 @@ packageはv1.6.0、公開診断値は `2026-10-18-movement-core`。対応：[Iss
 - `https://hane-san.github.io/ARPG/` と配下のdistは200。旧 `/Koitototsukuru/` は404で自動転送されない。予定 `/hane-no-ARPG01/` も404で、目標候補の名前への改名は未実施。
 - 表示名は「凪の島 — NAGI」のまま。表示正本・技術ID・両manifestの起動パスとscope/idは維持する。
 - この環境のoriginは `https://github.com/hane-san/ARPG.git` へ更新済み。worktreeはremote設定を共有する。別環境のclone、Codex/Claude/Routineの対象選択、iPhoneホーム画面は人間が確認する。
-- GitHub上でPR #6の独立レビュー記録は確認できない。外部での実施有無は未確認。[統合後レビュー](rename-review-handoff.md) を依頼し、実機・外部AI接続・失敗CIでのマージ制限の実地テストは未検証として残す。
+- GitHub上でPR #6の独立レビュー記録は確認できない。外部での実施有無は未確認。[統合後レビュー](rename-review-handoff.md) を依頼し、実機・外部AI接続は未検証として残す。
+- main保護は [検証専用PR #9](https://github.com/hane-san/ARPG/pull/9) で実地確認済み。最新mainが直接の親・競合なし・draftでないPRでrules=failure / browser=successとGitHubのmergeable_state=blockedを確認し、PRを閉じた。マージ操作は試みずmain SHAも不変。独立コード監査の代わりにはしない。
 - 対応：[Issue #7](https://github.com/hane-san/ARPG/issues/7)。以下の初期監査・基盤統合時の記録も保持する。
 
 ## 基盤統合後の現在地（2026-10-18追記）

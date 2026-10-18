@@ -34,3 +34,4 @@
 - 現在の公開は `https://hane-san.github.io/ARPG/`。root/distは200、旧 `/Koitototsukuru/` は404。現在参照を修正し、旧名・URL・SHA・runの履歴は保持する。対応：[Issue #7](https://github.com/hane-san/ARPG/issues/7)。
 - 目標候補 `hane-no-ARPG01` と表示名「蒼ト凪ノ島ノ旅」は未反映。今回追加のRename・表示名切替は行わず、技術ID・ゲーム・配布物を維持する。
 - GitHub上でPR #6の独立レビュー記録は確認できない。外部での実施有無は未確認であり、完了扱いにせず [統合後レビュー](rename-review-handoff.md) を依頼する。iPhone実機と外部AIの新repo選択も未検証。
+- main保護は検証専用PR #9でrules=failure / browser=success時のGitHub blockedを実地確認後に閉じ、mainは不変。これはCIによる制限の証拠であり、準備PR #6の独立レビューを代替しない。

@@ -43,6 +43,7 @@ browserだけは `--url http://127.0.0.1:<port>/` で起動済みの別サーバ
 - 改名後の現在地（2026-10-18）：repoは `hane-san/ARPG`、公開 `/ARPG/` のroot/distは200、旧 `/Koitototsukuru/` は404。main `5343128a905b8c526c88b595ef42ea3bd96b73ca` の [CI](https://github.com/hane-san/ARPG/actions/runs/39137331077) と [Pages配信](https://github.com/hane-san/ARPG/actions/runs/39137387075) は成功。
 - `tests/rename-check.py` は旧 `/Koitototsukuru/`、現在 `/ARPG/`、予定 `/hane-no-ARPG01/` をローカルで検査。予定URLが本番公開済みという意味ではない。完全回帰の末尾から実行する。
 - 準備PR #6は統合済みだが、GitHub上に独立レビュー記録がない。外部での実施有無は未確認。[統合後レビュー](rename-review-handoff.md) とiPhone実機・ホーム画面再登録は残る。
+- main保護の実地確認（2026-10-18）：[検証専用PR #9](https://github.com/hane-san/ARPG/pull/9) / [CI](https://github.com/hane-san/ARPG/actions/runs/39177212521) で、最新mainが直接の親・競合なし・draftでないPRのrules=failure / browser=success時にGitHubがblockedになることを確認。意図的なNodeテストの失敗をログでも確認し、PRを閉じた。マージを試みずmain SHA不変。独立監査・実機確認の代わりにはしない。
 
 - iPhone Safari実機の操作感・酔い、FPS、長時間の熱や負荷、実際の聴感、ホーム画面起動。
 - 開始→短い保持入力→全速/継続加速→旋回→離す/中断→停止→復帰、海岸・細い障害物、島民への接近を確認。

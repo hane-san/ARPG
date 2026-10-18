@@ -204,4 +204,4 @@ with sync_playwright() as p:
  browser.close()
 
 # Keep the project-path rehearsal in the existing full browser entrypoint.
-subprocess.run([sys.executable,str(root/'rename-check.py')],check=True)
+subprocess.run([sys.executable,str(root/'tests/rename-check.py')],check=True)

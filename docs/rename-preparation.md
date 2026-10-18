@@ -1,8 +1,16 @@
 # ARPG改名・表示名移行の事前監査と手順
 
-2026-10-18。対象は **hane-san/Koitototsukuruだけ**。基準main：`80bfd81bdc4e2ca7259d3a643abbf32d0d8ab93f`。
+2026-10-18。対象は **hane-san/Koitototsukuruだけ**。初期監査の基準main：`80bfd81bdc4e2ca7259d3a643abbf32d0d8ab93f`。
 packageはv1.6.0、公開診断値は `2026-10-18-movement-core`。対応：[Issue #5](https://github.com/hane-san/Koitototsukuru/issues/5)。
 今回、GitHubのRename、表示名切替、main統合、Settings操作は行わない。SRPGやcyber-punkを変更・統合しない。
+
+## 基盤統合後の現在地（2026-10-18追記）
+
+- 人間が基盤PR #4をマージ。最新main `2f27f4617603c1f90e161005328aabfa777b039b` を本準備ブランチへ通常のmergeで取り込み、共通契約・テンプレート・既存の記録を保持した。
+- 人間が設定した [main-protection](https://github.com/hane-san/Koitototsukuru/rules/25345749) をAPIで確認。対象はmainのみ、Active、PR必須・承認人数0、GitHub Actionsの `rules` / `browser` 必須・最新mainへの追随あり、削除・force push禁止、bypassなし。
+- 統合済みmainの [CI](https://github.com/hane-san/Koitototsukuru/actions/runs/39135984319) と [Pages配信](https://github.com/hane-san/Koitototsukuru/actions/runs/39135984256) は成功。準備PR自体の最新SHA・再検証結果はPR本文に記録する。
+- 失敗CIでマージが止まる実地テスト、独立レビュー、人間の試遊、iPhone実機、実Renameは未実施。設定確認をこれらの完了と扱わない。
+- 両作品の準備は並行して進めるが、本PRの差分・検証・独立レビューはARPGだけを対象とする。[独立レビューへの引継ぎ](rename-review-handoff.md)。実RenameはSRPGの移行安定後とする。
 
 ## 新旧の対応
 
@@ -41,12 +49,12 @@ GitHubの旧repo URLの転送と、旧PagesのプロジェクトサイトURLは�
 | サービスワーカー | 登録コード・配布ファイルなし | 新しい固定キャッシュを導入しない。OS/ブラウザの表示キャッシュは実機で別確認 |
 | Pages（API確認） | legacy、main / root、旧URL、status=built | 実Rename後に設定・再配信・新URLを確認。配信先をdistへ勝手に変更しない |
 | git remote（取得済み） | origin fetch/pushとも旧Git URL | 今回変更なし。実改名後に各cloneで更新。worktreeはremote設定を共有するため調整 |
-| CI / 基盤PR #4 | GitHubには `Nagi checks` があるがmainにはまだworkflow未配置。基盤PR #4は未マージ | PR検証に必要な同じCI定義とChromium選択を引継ぎ、既存browser-checkの完全回帰へ新旧パス検査を接続。workflowは #4と同一で統合時の競合を避ける |
+| CI / 基盤PR #4 | 初期監査時はmain未配置だったが、現在は基盤PR #4を統合済み。`Nagi checks`、rules/browser、contents:read | 最新mainと同じworkflow・Chromium選択を維持し、既存browser-checkの完全回帰へ新旧パス検査を接続。workflow自体に本PRの差分はない |
 | 現在参照と過去資料 | READMEの旧Pagesリンク、基盤PR #4のAGENTS/DEVELOPMENT等のrepo参照、研究記録の旧名 | 実改名後の修復PRで現在参照を更新。過去の判断・URL・SHA・run記録は無差別置換しない |
 | 外部AI・Routine・共有先 | Codex/Claude/ChatGPTの対象repo、Routine、ショートカット等の管理状態は未確認 | 実改名後に人間が対象・権限・ブランチを再確認し、実際のIssue→PR受渡しを試す |
 
 旧公開URLのroot / dist HTML / 両manifest / rootアイコンは実HTTPで200を確認し、名称・起動パスは上表と一致した。
-GitHubのhomepageは未設定。main protected=falseで、main保護も導入後の人間設定が必要。
+初期監査時のGitHubのhomepageは未設定、main protected=falseだった。基盤統合後の保護設定は上の追記を参照。
 外部URLは主にPagesの現在参照と、操作研究の参考資料。ゲームの配信コードに旧repoの絶対アセットURLはない。
 
 ## 表示名の変更方法
@@ -77,7 +85,7 @@ READMEはその小PRで現在の見出しを編集し、研究資料の歴史的
 
 ### 改名前
 
-1. 基盤PR #4の運用資料・main保護を先に確認・統合する。この準備PRのCIは同じ定義を引き継ぎ、新パス検査は既存ブラウザ入口から呼び出す。後から統合する側で検証の接続を保持する。
+1. 基盤PR #4は統合済みで、main保護もAPIで適用を確認した。本準備ブランチにも最新mainを取り込み、同じCI定義を維持する。新パス検査は既存ブラウザ入口から呼び出す接続を保持する。
 2. この準備PRをCI・独立レビュー・人間確認後に統合。リスクmedium。自己検証を独立監査として数えない。
 3. SRPGの実際の移行・新URL・実機確認が安定してからARPGの実Renameへ進む。準備PRは両作品で先に用意できる。
 4. 旧URL、main SHA、package/release、root→dist、開始・一本指移動・停止、ホーム画面の現状を記録する。セーブは未実装なので「進行を復元できた」とは報告しない。

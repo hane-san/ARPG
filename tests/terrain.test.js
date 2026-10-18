@@ -1,4 +1,7 @@
-import test from 'node:test';import assert from 'node:assert/strict';import {height,walkable,pointerInput,dragInput,moveOnIsland,routes,landmarks,MOON_DIRECTION,skyRay,turnVelocity,WORLD_BOUNDS,CRUISE_SPEED,travelSpeed} from '../dist/terrain.js';
+import test from 'node:test';import assert from 'node:assert/strict';
+import {height,walkable,routes,landmarks,MOON_DIRECTION,skyRay,WORLD_BOUNDS} from '../dist/terrain.js';
+import {pointerInput,dragInput,CollisionWorld,turnVelocity,CRUISE_SPEED,travelSpeed} from '../dist/movement.js';
+const moveOnIsland=(x,z,dx,dz,obstacles=[])=>{const p=new CollisionWorld(obstacles,{height,walkable}).move(x,z,dx,dz);return {x:p.x,z:p.z};};
 test('one-thumb horizontal strokes steer without any lateral translation',()=>{
  for(let x=-1;x<=1;x+=.02){const p=pointerInput(x,0);assert.equal(p.strafe,0);assert.equal(p.forward,0);assert.ok(Math.abs(p.turn)<=1);assert.ok(Math.abs(p.turn+pointerInput(-x,0).turn)<1e-10);}
  assert.equal(pointerInput(1,0).turn,1);assert.equal(pointerInput(-1,0).turn,-1);

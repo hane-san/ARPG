@@ -17,10 +17,11 @@ window._qa={
   }}keys.clear();update(1/60);return {steps,position:{...player}};
  },
  view(yaw){player.yaw=yaw;resetCameraHistory();render();},routes,landmarks,
- clearance(){let closest=Infinity,at=null;for(const route of routes)for(let i=1;i<route.length;i++){
+ clearance(){let closest=Infinity;for(const route of routes)for(let i=1;i<route.length;i++){
   const [ax,az]=route[i-1],[bx,bz]=route[i],len=Math.hypot(bx-ax,bz-az);
-  for(let t=0;t<=1;t+=.25/len)for(const [x,z,r] of obstacles){const d=Math.hypot(ax+(bx-ax)*t-x,az+(bz-az)*t-z)-r-.23;if(d<closest){closest=d;at=[x,z];}}
- }return {closest,at};}
+  for(let t=0;t<=1;t+=.25/len)closest=Math.min(closest,collisionWorld.clearance(ax+(bx-ax)*t,az+(bz-az)*t));
+ }return {closest};}
+
 };
 '''
 with sync_playwright() as p:

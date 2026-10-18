@@ -1,11 +1,11 @@
 {
   "name": "nagi-island",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "private": true,
   "type": "module",
   "description": "A quiet first person island exploration prototype",
   "scripts": {
-    "check": "node --check dist/island.js && node --test tests/terrain.test.js",
+    "check": "node --check dist/island.js && node --check dist/movement.js && node --test tests/*.test.js",
     "dev": "python3 -m http.server 4173 --directory dist",
     "build": "node scripts/build.mjs"
   }

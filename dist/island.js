@@ -1,4 +1,5 @@
-const {height,walkable,clamp,smooth,pointerInput,dragInput,moveOnIsland,routes,landmarks,distanceToRoute,WORLD_BOUNDS,monuments,expeditionRoute,valleyRoute,easternRoute,saltRoute,MOON_DIRECTION,turnVelocity,CRUISE_SPEED,travelSpeed}=await import('./terrain.js'+new URL(import.meta.url).search);
+const {height,walkable,clamp,smooth,routes,landmarks,distanceToRoute,WORLD_BOUNDS,monuments,expeditionRoute,valleyRoute,easternRoute,saltRoute,MOON_DIRECTION}=await import('./terrain.js'+new URL(import.meta.url).search);
+const {CRUISE_SPEED,footStride,CollisionWorld,circleCollider,boxCollider,GestureInput,createMotionState,resetMotion,stepMotion,readMovementInput}=await import('./movement.js'+new URL(import.meta.url).search);
 const canvas=document.querySelector('#world'),gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
 if(!gl){document.querySelector('#error').hidden=false;document.querySelector('#begin').disabled=true;throw Error('WebGL unavailable');}
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -99,26 +100,28 @@ const terrain={count:terrainChunks.reduce((n,b)=>n+b.count,0)};
 for(let i=0;i<19;i++){const a=i/19*Math.PI*2,r=rnd(1650,2300);sphere(Math.cos(a)*r,-8,Math.sin(a)*r,rnd(90,240),rnd(25,80),rnd(70,180),hex(i%2?'aebfba':'b5c4be'),12,5);}
 const distant=batch();
 const obstacles=[],steppingStones=[];
-function rock(x,z,s){let y=height(x,z);sphere(x,y+s*.23,z,s,s*.55,s*.72,pal.stone,7,4);if(s>.7&&y>.3)obstacles.push([x,z,s*.6]);}
+const addCircle=(x,z,r,kind='solid')=>obstacles.push(circleCollider(x,z,r,kind));
+const addBox=(x,z,hx,hz,kind='solid')=>obstacles.push(boxCollider(x,z,hx,hz,kind));
+function rock(x,z,s){let y=height(x,z);sphere(x,y+s*.23,z,s,s*.55,s*.72,pal.stone,7,4);if(s>.7&&y>.3)addCircle(x,z,s*.6);}
 for(let i=0;i<85;i++){let a=rnd(0,Math.PI*2),r=rnd(.82,1.07),x=Math.cos(a)*35*r,z=Math.sin(a)*39*r;if(height(x,z)>-.4&&distanceToRoute(x,z)>2.8)rock(x,z,rnd(.3,1.2));}
 // A few worn stepping stones lead inland.
 for(let i=0;i<22;i++){const t=i/21,j=Math.floor(t*(path.length-1)),u=t*(path.length-1)-j;const a=path[Math.min(j,path.length-2)],b=path[Math.min(j+1,path.length-1)],x=a[0]*(1-u)+b[0]*u+rnd(-.5,.5),z=a[1]*(1-u)+b[1]*u; sphere(x,height(x,z)+.025,z,.36,.065,.25,hex('bdbfb0'),7,3);steppingStones.push([x,z]);}
-function olive(x,z,s=1){const y=height(x,z);branch([x,y,z],[x+.12*s,y+2.15*s,z],.12*s,pal.bark);for(let i=0;i<4;i++){const a=i*2.4,dx=Math.cos(a)*.7*s,dz=Math.sin(a)*.65*s;branch([x,y+1.1*s,z],[x+dx,y+2.5*s,z+dz],.06*s,pal.bark);sphere(x+dx,y+2.6*s,z+dz,.85*s,.5*s,.72*s,i%2?pal.olive:hex('a8b7a1'),9,5);}obstacles.push([x,z,.25*s]);}
+function olive(x,z,s=1){const y=height(x,z);branch([x,y,z],[x+.12*s,y+2.15*s,z],.12*s,pal.bark);for(let i=0;i<4;i++){const a=i*2.4,dx=Math.cos(a)*.7*s,dz=Math.sin(a)*.65*s;branch([x,y+1.1*s,z],[x+dx,y+2.5*s,z+dz],.06*s,pal.bark);sphere(x+dx,y+2.6*s,z+dz,.85*s,.5*s,.72*s,i%2?pal.olive:hex('a8b7a1'),9,5);}addCircle(x,z,.1*s,'tree');}
 for(let i=0;i<64;i++){const x=rnd(-29,29),z=rnd(-30,27);if(height(x,z)<1.2||distanceToRoute(x,z)<3||Math.hypot(x+4,z+12)<6||Math.hypot(x-23,z-8)<4)continue;olive(x,z,rnd(.8,1.25));}
 // Surreal plants: striped umbrella fungi and curled sea ferns.
-function mushroom(x,z,s,hue=0){const y=height(x,z),c=[pal.purple,pal.pink,pal.blue][hue];cone(x,y,z,.1*s,.15*s,1.65*s,pal.cream,8);sphere(x,y+1.65*s,z,.9*s,.37*s,.9*s,c,18,6);for(let j=0;j<3;j++)torus(x,y+(1.68+j*.09)*s,z,(.78-j*.19)*s,.025*s,j%2?pal.cream:pal.pink);for(let i=0;i<5;i++){const a=i*1.26;sphere(x+Math.cos(a)*.44*s,y+1.94*s,z+Math.sin(a)*.44*s,.07*s,.025*s,.07*s,pal.cream,5,3);}obstacles.push([x,z,.22*s]);}
+function mushroom(x,z,s,hue=0){const y=height(x,z),c=[pal.purple,pal.pink,pal.blue][hue];cone(x,y,z,.1*s,.15*s,1.65*s,pal.cream,8);sphere(x,y+1.65*s,z,.9*s,.37*s,.9*s,c,18,6);for(let j=0;j<3;j++)torus(x,y+(1.68+j*.09)*s,z,(.78-j*.19)*s,.025*s,j%2?pal.cream:pal.pink);for(let i=0;i<5;i++){const a=i*1.26;sphere(x+Math.cos(a)*.44*s,y+1.94*s,z+Math.sin(a)*.44*s,.07*s,.025*s,.07*s,pal.cream,5,3);}addCircle(x,z,.12*s,'plant');}
 function fern(x,z,s){const y=height(x,z);for(let i=0;i<4;i++){const a=i*1.5,dx=Math.cos(a),dz=Math.sin(a);let p=[x,y,z];for(let j=1;j<=8;j++){const t=j/8,b=[x+dx*Math.sin(t*2.6)*.8*s,y+t*2.1*s,z+dz*Math.sin(t*2.6)*.8*s];branch(p,b,.035*s,j%2?pal.purple:pal.pink);if(j>2&&j<7)sphere(b[0]+dz*.18*s,b[1],b[2]-dx*.18*s,.21*s,.07*s,.11*s,j%2?pal.blue:pal.pink,6,3);p=b;}sphere(p[0],p[1],p[2],.13*s,.14*s,.13*s,pal.cream,7,4);}}
 for(const [x,z,s,c] of [[-4,24,1.25,0],[-6,23,.65,1],[-3,22,.7,2],[15,21,1.45,1],[17,19,.75,0],[19,22,.5,2],[-14,6,1.6,0],[-16,7,.9,2],[-13,8,.6,1],[9,-4,1.1,0],[10,-7,.65,1],[-24,-10,1.4,2],[-46,22,1.2,1]])mushroom(x,z,s,c);
 for(let i=0;i<34;i++){const x=rnd(-28,28),z=rnd(-29,30);if(height(x,z)>1&&distanceToRoute(x,z)>2.4)fern(x,z,rnd(.45,.9));}
 // Tiny pastel grass, flowers, and salt-worn pebbles.
 for(let i=0;i<600;i++){const x=rnd(-34,34),z=rnd(-38,38),y=height(x,z);if(y<1||distanceToRoute(x,z)<2)continue;const s=rnd(.12,.35),c=i%5===0?pal.pink:hex('a0b393');tri([x-.09,y,z],[x,y+s,z],[x+.09,y,z],c);tri([x,y,z-.09],[x,y+s,z],[x,y,z+.09],c);if(i%11===0)sphere(x,y+s,z,.07,.06,.07,pal.cream,5,3);}
 // Torii, with a subdued vermilion pigment washed by sea air.
-const tx=23,tz=8,ty=height(tx,tz);for(const x of [tx-1.55,tx+1.55]){cone(x,ty,tz,.17,.14,3.8,pal.red,9);box(x,ty-.02,tz,.6,.18,.6,pal.stone);}box(tx,ty+2.9,tz,3.8,.2,.22,pal.red);box(tx,ty+3.65,tz,4.6,.25,.43,pal.red);box(tx,ty+3.91,tz,4.9,.1,.54,hex('76877e'));box(tx,ty+3.1,tz,.3,.5,.14,pal.cream);obstacles.push([tx-1.55,tz,.35],[tx+1.55,tz,.35]);
+const tx=23,tz=8,ty=height(tx,tz);for(const x of [tx-1.55,tx+1.55]){cone(x,ty,tz,.17,.14,3.8,pal.red,9);box(x,ty-.02,tz,.6,.18,.6,pal.stone);}box(tx,ty+2.9,tz,3.8,.2,.22,pal.red);box(tx,ty+3.65,tz,4.6,.25,.43,pal.red);box(tx,ty+3.91,tz,4.9,.1,.54,hex('76877e'));box(tx,ty+3.1,tz,.3,.5,.14,pal.cream);addCircle(tx-1.55,tz,.14,'gate');addCircle(tx+1.55,tz,.14,'gate');
 // An empty, open-sided hill shrine. The floor remains walkable.
-const sx=-4,sz=-13,sy=height(sx,sz);box(sx,sy-.2,sz,5.5,.25,4.5,pal.stone);box(sx,sy+.05,sz,4.6,.18,3.7,hex('b5aa94'));for(const x of [sx-2,sx+2])for(const z of [sz-1.5,sz+1.5]){box(x,sy+.2,z,.16,2.7,.16,pal.bark);obstacles.push([x,z,.25]);}box(sx,sy+2.8,sz,4.5,.18,3.8,pal.bark);
+const sx=-4,sz=-13,sy=height(sx,sz);box(sx,sy-.2,sz,5.5,.25,4.5,pal.stone);box(sx,sy+.05,sz,4.6,.18,3.7,hex('b5aa94'));for(const x of [sx-2,sx+2])for(const z of [sz-1.5,sz+1.5]){box(x,sy+.2,z,.16,2.7,.16,pal.bark);addCircle(x,z,.06,'pillar');}box(sx,sy+2.8,sz,4.5,.18,3.8,pal.bark);
 for(const sign of [-1,1]){const a=[sx-2.9,sy+2.9,sz+sign*2.3],b=[sx+2.9,sy+2.9,sz+sign*2.3],c=[sx+2.9,sy+4,sz],d=[sx-2.9,sy+4,sz];quad(a,b,c,d,hex('889c98'));}box(sx,sy+4,sz,6,.13,.18,hex('7c8f8a'));cone(sx,sy+.2,sz,.48,.4,.6,pal.stone,8);
 // Shore lanterns and a weathered landing jetty.
-function lantern(x,z){const y=height(x,z);cone(x,y,z,.3,.18,.2,pal.stone);box(x,y+.2,z,.19,.7,.19,pal.stone);box(x,y+.9,z,.48,.45,.48,pal.cream);cone(x,y+1.35,z,.45,0,.3,pal.stone,4);obstacles.push([x,z,.27]);}
+function lantern(x,z){const y=height(x,z);cone(x,y,z,.3,.18,.2,pal.stone);box(x,y+.2,z,.19,.7,.19,pal.stone);box(x,y+.9,z,.48,.45,.48,pal.cream);cone(x,y+1.35,z,.45,0,.3,pal.stone,4);addCircle(x,z,.14,'lantern');}
 for(const p of [[-6,-8],[-1,-8],[19,12],[26,12],[-29,22]])lantern(...p);
 for(let i=0;i<18;i++)box(7.5,.35,33+i*.5,2.1,.12,.43,hex(i%2?'a6a895':'b1b09c'));for(const z of [34,37,40])for(const x of [6.4,8.6]){cone(x,-1,z,.1,.08,2,pal.bark);}
 // An old mooring ring and a few ribbons at the far end of the sandbar.
@@ -127,8 +130,8 @@ const world=batch();
 // Northern scenery is split into small batches, so a phone need not draw plants behind it.
 const scenery=[];
 function sceneryBatch(x,z,r){scenery.push({...batch(),x,z,r});}
-function umbrella(x,z,s,tint){const y=height(x,z);branch([x,y,z],[x+.2*s,y+3.2*s,z],.14*s,pal.bark);cone(x+.2*s,y+3.05*s,z,1.55*s,.15*s,.65*s,tint,12);sphere(x+.2*s,y+3.7*s,z,.4*s,.16*s,.4*s,pal.cream,8,3);for(let i=0;i<3;i++){const a=i*2.094;branch([x,y+1.8*s,z],[x+Math.cos(a)*1.15*s,y+3.1*s,z+Math.sin(a)*1.15*s],.055*s,pal.pink);}obstacles.push([x,z,.24*s]);}
-function signpost(x,z){const y=height(x,z);box(x,y,z,.12,1.25,.12,pal.bark);box(x+.28,y+1,z,.85,.2,.1,pal.cream);obstacles.push([x,z,.2]);}
+function umbrella(x,z,s,tint){const y=height(x,z);branch([x,y,z],[x+.2*s,y+3.2*s,z],.14*s,pal.bark);cone(x+.2*s,y+3.05*s,z,1.55*s,.15*s,.65*s,tint,12);sphere(x+.2*s,y+3.7*s,z,.4*s,.16*s,.4*s,pal.cream,8,3);for(let i=0;i<3;i++){const a=i*2.094;branch([x,y+1.8*s,z],[x+Math.cos(a)*1.15*s,y+3.1*s,z+Math.sin(a)*1.15*s],.055*s,pal.pink);}addCircle(x,z,.12*s,'tree');}
+function signpost(x,z){const y=height(x,z);box(x,y,z,.12,1.25,.12,pal.bark);box(x+.28,y+1,z,.85,.2,.1,pal.cream);addCircle(x,z,.045,'signpost');}
 // Tall lavender umbrellas enclose the west path; the path itself stays generous and clear.
 for(let i=0;i<42;i++){const x=rnd(-51,-16),z=rnd(-79,-37);if(height(x,z)>1.3&&distanceToRoute(x,z)>3.3)umbrella(x,z,rnd(.85,1.6),i%3?pal.purple:pal.pink);}
 for(const [x,z] of [[-32,-52],[-41,-61],[-28,-67],[-18,-47]])if(distanceToRoute(x,z)>2.5)mushroom(x,z,.9,2);
@@ -138,7 +141,7 @@ signpost(-12.6,-34);sceneryBatch(-31,-56,32);
 for(const z of [-61,-68,-75])for(let x=20;x<=48;x+=6){if(height(x,z)>1&&distanceToRoute(x,z)>3.2)olive(x,z,.95);}
 for(const z of [-62.8,-69.8,-76.8])for(let x=17;x<49;x+=1.2){if(height(x,z)>.9&&distanceToRoute(x,z)>2.7)box(x,height(x,z)-.12,z,1.1,.38,.48,hex('b1b8a6'));}
 // A small field shelter and empty bench look across the eastern sea.
-const hx=44,hz=-72,hy=height(hx,hz);for(const x of [hx-1.5,hx+1.5])box(x,hy,hz,.13,2,.13,pal.bark);box(hx,hy+2,hz,3.8,.14,2.5,hex('adb5a0'));box(hx,hy+.45,hz,2.6,.14,.6,pal.bark);for(const x of [hx-1.5,hx,hx+1.5])obstacles.push([x,hz,.35]);
+const hx=44,hz=-72,hy=height(hx,hz);for(const x of [hx-1.5,hx+1.5])box(x,hy,hz,.13,2,.13,pal.bark);box(hx,hy+2,hz,3.8,.14,2.5,hex('adb5a0'));box(hx,hy+.45,hz,2.6,.14,.6,pal.bark);addBox(hx,hz,1.15,.23,'bench');for(const x of [hx-1.5,hx+1.5])addCircle(x,hz,.05,'pillar');
 lantern(32,-62);signpost(17,-58);sceneryBatch(33,-69,29);
 // Glass cove: a curved sand beach, shell spirals, reeds and pale shoreline stones.
 for(let i=0;i<18;i++){const a=2.1+i/17*1.7,x=47+Math.cos(a)*25.8,z=-44+Math.sin(a)*14.8;if(height(x,z)>0&&distanceToRoute(x,z)>2.6)rock(x,z,rnd(.35,.75));}
@@ -150,16 +153,16 @@ for(let i=0;i<1000;i++){const x=rnd(-53,53),z=rnd(-112,-31),y=height(x,z);if(y<1
 for(const [x,z] of [[-18,-77],[-11,-84],[9,-90]])umbrella(x,z,.8,pal.blue);
 for(let i=0;i<12;i++){const a=i/12*Math.PI*2,x=6+Math.cos(a)*7,z=-104+Math.sin(a)*5;if(distanceToRoute(x,z)>3)rock(x,z,rnd(.5,1.1));}
 // Three cloth streamers, a low bench, and a sea-facing stone circle make the cape legible from afar.
-for(const x of [3.2,4.6,6]){const y=height(x,-105);branch([x,y,-105],[x,y+4,-105],.065,pal.bark);quad([x,y+3.9,-105],[x+.85,y+3.72,-105],[x+.82,y+2.4,-105],[x+.12,y+2.55,-105],x<5?pal.pink:pal.cream);obstacles.push([x,-105,.2]);}
+for(const x of [3.2,4.6,6]){const y=height(x,-105);branch([x,y,-105],[x,y+4,-105],.065,pal.bark);quad([x,y+3.9,-105],[x+.85,y+3.72,-105],[x+.82,y+2.4,-105],[x+.12,y+2.55,-105],x<5?pal.pink:pal.cream);addCircle(x,-105,.05,'flagpole');}
 box(9,height(9,-103)+.4,-103,2.5,.15,.65,pal.bark);for(const x of [8.1,9.9])box(x,height(x,-103),-103,.15,.45,.5,pal.stone);
-for(const x of [8.1,9,9.9])obstacles.push([x,-103,.4]);
+addBox(9,-103,1.1,.24,'bench');
 lantern(3,-96);signpost(-2,-86);sceneryBatch(0,-88,78);
 // Broad landscapes beyond the first cape. Each district has its own culled buffer.
 function quietTree(x,z,s=1,tint=pal.olive){
  const y=height(x,z);cone(x,y,z,.16*s,.09*s,3.1*s,pal.bark,5);
  sphere(x,y+3.3*s,z,1.45*s,.85*s,1.25*s,tint,7,4);
  sphere(x+.7*s,y+3.6*s,z-.5*s,.95*s,.65*s,.9*s,tint,6,3);
- obstacles.push([x,z,.24*s]);
+ addCircle(x,z,.12*s,'tree');
 }
 function shoreHouse(x,z,w=6){
  const y=height(x,z),h=w*.65;box(x,y,z,w,h,w*.8,hex('d0c9b4'));
@@ -168,7 +171,7 @@ function shoreHouse(x,z,w=6){
  box(x,y+.5,z+w*.405,w*.22,h*.65,.06,pal.bark);
  for(const a of [-.3,.3])box(x+a*w,y+h*.56,z+w*.41,w*.15,h*.25,.08,pal.blue);
  // Several overlapping circles follow the footprint without putting invisible walls in the street.
- for(const dx of [-.3,0,.3])for(const dz of [-.22,.22])obstacles.push([x+dx*w,z+dz*w,w*.22]);
+ addBox(x,z,w*.46,w*.36,'house');
 }
 for(const [x,z] of [[-20,-145],[-2,-192],[-109,-224],[-245,-273],[-270,-416],[-223,-489],[-127,-559],[-111,-675],[-69,-777],[9,-815],[217,-632],[302,-510],[279,-391],[166,-291],[64,-222]])if(distanceToRoute(x,z)>3.5)signpost(x,z);
 sceneryBatch(-30,-165,80);
@@ -183,7 +186,7 @@ for(const [x,z,w] of [[-323,-312,7],[-329,-326,6],[-327,-343,7],[-296,-322,6],[-
 for(let i=0;i<26;i++){const x=-349+i*.8,z=-351,y=height(x,z);box(x,y-.05,z,.75,.16,2.2,pal.stone);}
 lantern(-317,-327);lantern(-300,-345);sceneryBatch(-319,-341,64);
 // Dark, layered rock walls follow a dry, gently graded floor through the gorge.
-for(let i=0;i<18;i++){const z=-296-i*14,centre=.15*(z+400);for(const sign of [-1,1]){const x=centre+sign*rnd(35,48);if(distanceToRoute(x,z)<9)continue;const y=height(x,z),h=rnd(8,18),r=rnd(3,6);for(let j=0;j<3;j++)cone(x,y+j*h/3,z,r*(1-j*.14),r*(.9-j*.14),h/3,hex(j%2?'9da8a0':'b3b6a7'),7);obstacles.push([x,z,r*.7]);}}
+for(let i=0;i<18;i++){const z=-296-i*14,centre=.15*(z+400);for(const sign of [-1,1]){const x=centre+sign*rnd(35,48);if(distanceToRoute(x,z)<9)continue;const y=height(x,z),h=rnd(8,18),r=rnd(3,6);for(let j=0;j<3;j++)cone(x,y+j*h/3,z,r*(1-j*.14),r*(.9-j*.14),h/3,hex(j%2?'9da8a0':'b3b6a7'),7);addCircle(x,z,r*.7);}}
 for(const p of [[23,-326],[-7,-410],[-25,-508]])lantern(...p);
 sceneryBatch(0,-425,180);
 // Terraced rice paddies and olive rows, with generous gaps where the walking path crosses.
@@ -191,30 +194,30 @@ for(let row=0;row<7;row++){const z=-462-row*14;for(let x=-278;x<-168;x+=4){if(di
 for(const x of [-273,-175])for(const z of [-477,-519,-547])if(height(x,z)>3&&distanceToRoute(x,z)>8)quietTree(x,z,1.8);
 shoreHouse(-252,-551,7);sceneryBatch(-224,-511,95);
 // White quarry walls, stepped away from the traversable lane.
-for(let i=0;i<5;i++){const x=352+i*6,z=-515-i*12,y=height(x,z);box(x,y-.3,z,13,7+i*1.6,16,hex(i%2?'c5c7b8':'d6d0bc'));}
+for(let i=0;i<5;i++){const x=352+i*6,z=-515-i*12,y=height(x,z);box(x,y-.3,z,13,7+i*1.6,16,hex(i%2?'c5c7b8':'d6d0bc'));addBox(x,z,5.9,7.3,'quarry');}
 for(const [x,z] of [[300,-548],[293,-530],[328,-493]])rock(x,z,2.5);
 sceneryBatch(345,-541,80);
 // Five monumental, walk-around geometries. Their ground-level openings remain passable.
 for(const m of monuments){const {x,z,size:r,kind}=m,y=height(x,z);
  if(kind==='ring'){
   torus(x,y+r+5,z,r,1.1,pal.cream,true);
-  for(const a of [-1,1]){const px=x+a*r*.77;branch([px,height(px,z),z],[px,y+14,z],.65,pal.stone);obstacles.push([px,z,1]);}
+  for(const a of [-1,1]){const px=x+a*r*.77;branch([px,height(px,z),z],[px,y+14,z],.65,pal.stone);addCircle(px,z,.52,'sculpture');}
   for(let i=0;i<5;i++){const a=i*Math.PI/2.5;sphere(x+Math.cos(a)*r,y+r+5+Math.sin(a)*r,z,1.35,1.35,1.35,pal.blue,8,5);}
  }else if(kind==='pyramid'){
   const apex=[x,y+46,z],corners=[[-r,-r],[r,-r],[r,r],[-r,r]];
-  for(let i=0;i<4;i++){const [a,b]=corners[i],[c,d]=corners[(i+1)%4],base=[x+a,height(x+a,z+b),z+b],next=[x+c,height(x+c,z+d),z+d];branch(base,apex,.85,pal.cream);branch(base,next,.65,pal.stone);obstacles.push([x+a,z+b,1.2]);}
+  for(let i=0;i<4;i++){const [a,b]=corners[i],[c,d]=corners[(i+1)%4],base=[x+a,height(x+a,z+b),z+b],next=[x+c,height(x+c,z+d),z+d];branch(base,apex,.85,pal.cream);branch(base,next,.65,pal.stone);addCircle(x+a,z+b,.68,'sculpture');}
   // An inner floating diamond marks the middle without enclosing the player.
   for(let i=0;i<4;i++){const a=i*Math.PI/2,b=(i+1)*Math.PI/2;tri([x,y+26,z],[x+Math.cos(a)*7,y+18,z+Math.sin(a)*7],[x+Math.cos(b)*7,y+18,z+Math.sin(b)*7],i%2?pal.blue:pal.pink);}
  }else if(kind==='sphere'){
   sphere(x,y+34,z,r,r,r,pal.blue,24,14);torus(x,y+34,z,r+1,.45,pal.cream,true);torus(x,y+34,z,r+2,.4,pal.cream);
-  for(const sign of [-1,1]){const px=x+sign*19;branch([px,height(px,z),z],[px,y+34,z],.65,pal.stone);branch([px,y+34,z],[x,y+34,z],.4,pal.cream);obstacles.push([px,z,1]);}
+  for(const sign of [-1,1]){const px=x+sign*19;branch([px,height(px,z),z],[px,y+34,z],.65,pal.stone);branch([px,y+34,z],[x,y+34,z],.4,pal.cream);addCircle(px,z,.52,'sculpture');}
  }else if(kind==='cube'){
   box(x,y+17,z,r,r,r,hex('c5b5c9'));
-  for(const a of [-1,1])for(const b of [-1,1]){const px=x+a*(r/2+1),pz=z+b*(r/2+1);branch([px,height(px,pz),pz],[px,y+42,pz],.45,pal.stone);obstacles.push([px,pz,.8]);}
+  for(const a of [-1,1])for(const b of [-1,1]){const px=x+a*(r/2+1),pz=z+b*(r/2+1);branch([px,height(px,pz),pz],[px,y+42,pz],.45,pal.stone);addCircle(px,pz,.36,'sculpture');}
   for(const level of [y+16,y+41]){box(x,level,z-r/2-1,r+3,.5,.5,pal.cream);box(x,level,z+r/2+1,r+3,.5,.5,pal.cream);box(x-r/2-1,level,z,.5,.5,r+3,pal.cream);box(x+r/2+1,level,z,.5,.5,r+3,pal.cream);}
  }else if(kind==='spiral'){
   for(const phase of [0,Math.PI]){let last=null;for(let i=0;i<=64;i++){const t=i/64,a=t*Math.PI*3+phase,p=[x+Math.cos(a)*12,y+6+t*34,z+Math.sin(a)*12];if(last)branch(last,p,.8,phase?pal.pink:pal.blue);last=p;}}
-  for(const sign of [-1,1]){const px=x+sign*17;branch([px,height(px,z),z],[px,y+40,z],.4,pal.cream);obstacles.push([px,z,.7]);}
+  for(const sign of [-1,1]){const px=x+sign*17;branch([px,height(px,z),z],[px,y+40,z],.4,pal.cream);addCircle(px,z,.32,'sculpture');}
  }
  sceneryBatch(x,z,Math.max(70,r*2));
 }
@@ -259,7 +262,7 @@ function windmill(x,z,h){
   branch([px(1),py(1),z+2],[px(11),py(11),z+2],.12,pal.bark);
   quad([px(3),py(3),z+2],[px(10),py(10),z+2],[px(10)-Math.sin(a)*2.2,py(10)+Math.cos(a)*2.2,z+2],[px(3)-Math.sin(a)*1.1,py(3)+Math.cos(a)*1.1,z+2],i%2?pal.cream:hex('c4b6c8'));
  }
- obstacles.push([x,z,2.8]);
+ addCircle(x,z,2.8);
 }
 for(const [x,z,h] of [[878,-507,16],[927,-491,19],[945,-544,15]])windmill(x,z,h);
 for(let i=0;i<440;i++){
@@ -272,24 +275,24 @@ const lx=1132,lz=-645,ly=height(lx,lz);
 cone(lx,ly,lz,4,2.5,30,hex('e1d9c5'),14);cone(lx,ly+30,lz,3.3,3.3,1,pal.stone,14);
 cone(lx,ly+31,lz,2.5,2.5,3,pal.blue,12);cone(lx,ly+34,lz,3.5,.1,3,pal.cream,14);
 for(let i=0;i<8;i++){const a=i*Math.PI/4;branch([lx+Math.cos(a)*2.6,ly+31,lz+Math.sin(a)*2.6],[lx+Math.cos(a)*2.6,ly+34,lz+Math.sin(a)*2.6],.07,pal.stone);}
-box(lx,ly,lz+3.9,1.8,3,.12,pal.bark);obstacles.push([lx,lz,4]);
+box(lx,ly,lz+3.9,1.8,3,.12,pal.bark);addCircle(lx,lz,4);
 for(const [x,z] of [[1090,-624],[1125,-674],[1151,-637]])if(height(x,z)>1&&distanceToRoute(x,z)>9)rock(x,z,2.5);
 sceneryBatch(1123,-646,90);
 // Roofless reading room: the path passes between columns and rows of pale stone books.
 for(const dx of [-16,16])for(const dz of [-23,-8,8,23]){
  const x=1075+dx,z=-755+dz,y=height(x,z),h=dz===23?6:11;
- cone(x,y,z,1.2,1,h,pal.cream,8);box(x,y+h,z,3,.7,3,pal.stone);obstacles.push([x,z,1.3]);
+ cone(x,y,z,1.2,1,h,pal.cream,8);box(x,y+h,z,3,.7,3,pal.stone);addCircle(x,z,.95,'column');
  if(dz<8)branch([x,y+h+.6,z],[x,height(x,z+15)+11.6,z+15],.65,pal.stone);
 }
 for(const dx of [-25,25])for(let i=0;i<9;i++){
  const x=1075+dx,z=-779+i*6,y=height(x,z);
- box(x,y,z,1.4,2.8+(i%3)*.5,2.5,[pal.blue,pal.cream,pal.pink][i%3]);obstacles.push([x,z,1.3]);
+ box(x,y,z,1.4,2.8+(i%3)*.5,2.5,[pal.blue,pal.cream,pal.pink][i%3]);addBox(x,z,.57,1.05,'books');
 }
 lantern(1062,-738);sceneryBatch(1075,-755,80);
 // Open shell circle and small pink groves on the returning shore.
 for(let i=0;i<28;i++){
  const a=i*Math.PI*2/28,x=865+Math.cos(a)*24,z=-850+Math.sin(a)*24;
- if(height(x,z)>.3&&distanceToRoute(x,z)>8){cone(x,height(x,z),z,1.1,.2,2.7,i%2?pal.cream:pal.pink,5);obstacles.push([x,z,.8]);}
+ if(height(x,z)>.3&&distanceToRoute(x,z)>8){cone(x,height(x,z),z,1.1,.2,2.7,i%2?pal.cream:pal.pink,5);addCircle(x,z,.8);}
 }
 sceneryBatch(865,-850,65);
 for(const [gx,gz] of [[820,-804],[936,-791],[698,-719],[548,-595]]){
@@ -315,7 +318,7 @@ function islander(x,z,name,lines,tint){
  for(const s of [-1,1]){sphere(s*.087,1.61,.222,.051,.014,.014,ink,7,4);sphere(s*.087,1.685,.205,.06,.009,.013,hex('92817c'),6,3);}sphere(0,1.535,.241,.027,.063,.025,pal.cream,7,5);sphere(0,1.445,.22,.04,.011,.012,hex('ab817f'),8,4);
  for(let i=0;i<4;i++)box((i-1.5)*.095,1.82,-.025,.08,.14,.24,ink);
  box(-.2,.02,.1,.19,.1,.37,ink);box(.2,.02,.1,.19,.1,.37,ink);
- npcs.push({x,z,y:height(x,z),name,lines,mesh:batch(),last:-100,index:0,angle:0});obstacles.push([x,z,.65]);
+ npcs.push({x,z,y:height(x,z),name,lines,mesh:batch(),last:-100,index:0,angle:0,r:2,offset:new Float32Array([x,height(x,z),z])});addCircle(x,z,.46,'islander');
 }
 islander(6.3,18.2,'浜のひと',['……ようこそ。潮が、あなたを連れてきた。','この島では、どこへ急ぐこともありません。'], 'a3b4b2');
 islander(20.5,5.3,'面を干すひと',['こんにちは。今日は、いい凪ですね。','あの花は、昨日まで青かったのですよ。'], 'b4a7bd');
@@ -336,56 +339,38 @@ islander(1101,-660,'灯を守るひと',['遠くまで、来ましたね。あ�
 islander(1086,-745,'頁をめくるひと',['ここにある本は、まだ誰も書いていません。','帰りには、砂の星を数えていってください。'], 'b1b9c0');
 islander(854,-834,'星砂のひと',['一つずつ、波が置いていったのです。','西へ辿れば、塩田を通って元の島へ戻れます。'], 'c7b1b5');
 const CAMERA_FOV=68,RUN_SPEED=CRUISE_SPEED,GREETING_RADIUS=4.8;
-const player={x:8,z:30,y:height(8,30)+1.65,yaw:.25,yawRate:0,localForward:0,localSide:0,vx:0,vz:0};
+const collisionWorld=new CollisionWorld(obstacles,{height,walkable});
+const player=createMotionState(8,30,.25);player.y=height(8,30)+1.65;
 const camera={x:player.x,y:player.y,z:player.z,yaw:player.yaw};
 let previous={...camera},accumulator=0;
-function resetCameraHistory(){Object.assign(camera,{x:player.x,y:player.y,z:player.z,yaw:player.yaw});previous={...camera};accumulator=0;}
+function resetCameraHistory(){Object.assign(camera,{x:player.x,y:player.y,z:player.z,yaw:player.yaw});Object.assign(previous,camera);accumulator=0;}
 
-let actualSpeed=0,blockedFor=0;
-let started=false,time=0,last=performance.now(),held=false,pointer={x:0,y:0},pointerOrigin=null,pointerId=null,activeTouches=new Set(),multiTouchBlocked=false,keys=new Set(),greetUntil=0,placeUntil=0,shownPlaces=new Set(),lastGreetingDistance=null;
+let started=false,time=0,last=performance.now(),gestures=new GestureInput(),keys=new Set(),greetUntil=0,placeUntil=0,shownPlaces=new Set(),lastGreetingDistance=null;
 function resize(){const d=Math.min(devicePixelRatio||1,1.5),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}addEventListener('resize',resize);resize();
 function vp(){const f=1/Math.tan(CAMERA_FOV*Math.PI/360),aspect=canvas.width/canvas.height,n=.18,far=2600,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*camera.x+s*camera.z,-camera.y,-s*camera.x-c*camera.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
-let drawnVertices=0,drawCalls=0;
-function draw(b,offset=[0,0,0],yaw=0,water=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);drawnVertices+=b.count;drawCalls++;}
+const DRAW_ORIGIN=[0,0,0],WORLD_SCENERY_BOUNDS={x:0,z:-25,r:100},CAMERA_AXES=['x','y','z','yaw'];
+let drawnVertices=0,drawCalls=0,viewCos=1,viewSin=0,viewTangent=1,viewPadding=1;
+function draw(b,offset=DRAW_ORIGIN,yaw=0,water=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);drawnVertices+=b.count;drawCalls++;}
 function visible(b,range=1450){
  const dx=b.x-camera.x,dz=b.z-camera.z,d=Math.hypot(dx,dz);if(d>=range+b.r)return false;if(d<b.r)return true;
- const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),forward=-dx*s-dz*c,side=dx*c-dz*s,tangent=Math.tan(CAMERA_FOV*Math.PI/360)*canvas.width/canvas.height;
- return forward>-b.r&&Math.abs(side)<=Math.max(0,forward)*tangent+b.r*Math.hypot(1,tangent);
+ const forward=-dx*viewSin-dz*viewCos,side=dx*viewCos-dz*viewSin;
+ return forward>-b.r&&Math.abs(side)<=Math.max(0,forward)*viewTangent+b.r*viewPadding;
 }
 function render(){
+ viewCos=Math.cos(camera.yaw);viewSin=Math.sin(camera.yaw);viewTangent=Math.tan(CAMERA_FOV*Math.PI/360)*canvas.width/canvas.height;viewPadding=Math.hypot(1,viewTangent);
  drawnVertices=0;drawCalls=0;gl.disable(gl.DEPTH_TEST);gl.useProgram(skyProg);gl.bindBuffer(gl.ARRAY_BUFFER,skyBuf);const a=gl.getAttribLocation(skyProg,'a');gl.enableVertexAttribArray(a);gl.vertexAttribPointer(a,2,gl.FLOAT,false,0,0);
  gl.uniform1f(skyLoc.yaw,camera.yaw);gl.uniform1f(skyLoc.aspect,canvas.width/canvas.height);gl.uniform1f(skyLoc.tanHalfFov,Math.tan(CAMERA_FOV*Math.PI/360));gl.uniform3fv(skyLoc.moonDirection,MOON_DIRECTION);gl.drawArrays(gl.TRIANGLES,0,3);
  gl.enable(gl.DEPTH_TEST);gl.clear(gl.DEPTH_BUFFER_BIT);gl.useProgram(prog);gl.uniformMatrix4fv(loc.uVP,false,vp());gl.uniform3f(loc.uEye,camera.x,camera.y,camera.z);gl.uniform1f(loc.uTime,reduced?0:time);
- draw(distant);draw(sea,[0,0,0],0,1);for(const chunk of terrainChunks)if(visible(chunk))draw(chunk);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-1,-1);for(const chunk of roadChunks)if(visible(chunk))draw(chunk);gl.disable(gl.POLYGON_OFFSET_FILL);draw(foam);
- if(visible({x:0,z:-25,r:100},650))draw(world);
+ draw(distant);draw(sea,DRAW_ORIGIN,0,1);for(const chunk of terrainChunks)if(visible(chunk))draw(chunk);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-1,-1);for(const chunk of roadChunks)if(visible(chunk))draw(chunk);gl.disable(gl.POLYGON_OFFSET_FILL);draw(foam);
+ if(visible(WORLD_SCENERY_BOUNDS,650))draw(world);
  for(const chunk of scenery)if(visible(chunk))draw(chunk);draw(clouds);
- for(const npc of npcs){if(!visible({...npc,r:2},420))continue;draw(npc.mesh,[npc.x,npc.y,npc.z],npc.angle);}
+ for(const npc of npcs){if(!visible(npc,420))continue;draw(npc.mesh,npc.offset,npc.angle);}
 }
 
 function update(dt){
- let forward=0,strafe=0,turn=0;
- if(held){const i=pointerInput(pointer.x,pointer.y);forward=i.forward;strafe=i.strafe;turn=i.turn;}
- forward+=(keys.has('KeyW')||keys.has('ArrowUp')?1:0)-(keys.has('KeyS')||keys.has('ArrowDown')?1:0);
- strafe+=(keys.has('KeyD')?1:0)-(keys.has('KeyA')?1:0);
- turn+=(keys.has('ArrowRight')||keys.has('KeyE')?1:0)-(keys.has('ArrowLeft')||keys.has('KeyQ')?1:0);
- // Steering is independent of throttle: a diagonal thumb stroke describes a curve, not a sideways slide.
- const len=Math.max(1,Math.hypot(forward,strafe));forward/=len;strafe/=len;
- player.yawRate=turnVelocity(player.yawRate,turn,Math.abs(player.localForward),dt);
- player.yaw-=player.yawRate*dt;
- const boost=keys.has('ShiftLeft')||keys.has('ShiftRight')?1.25:1;
- const ahead=travelSpeed(forward)*boost,side=strafe*7.2*boost;
- const response=1-Math.exp(-dt*9);
- if(!forward&&!strafe){player.localForward=player.localSide=0;}
- else{if(ahead*player.localForward<0)player.localForward=0;player.localForward+=(ahead-player.localForward)*response;player.localSide+=(side-player.localSide)*response;}
- // Velocity rotates with the camera immediately, so steering does not leave an old sideways drift.
- const c=Math.cos(player.yaw),s=Math.sin(player.yaw);
- player.vx=player.localSide*c-player.localForward*s;player.vz=-player.localForward*c-player.localSide*s;
- const oldX=player.x,oldZ=player.z,next=moveOnIsland(player.x,player.z,player.vx*dt,player.vz*dt,obstacles);
- player.x=next.x;player.z=next.z;
- const travelled=Math.hypot(player.x-oldX,player.z-oldZ);actualSpeed=travelled/dt;
- blockedFor=Math.hypot(player.vx,player.vz)>.1&&actualSpeed<.03?blockedFor+dt:0;
- updateFootsteps(travelled,dt);
- player.y=height(player.x,player.z)+1.65;
+ const input=readMovementInput(gestures.held?gestures.value:null,keys);
+ stepMotion(player,input,dt,collisionWorld);
+ updateFootsteps(player.travelled,dt);
  for(const npc of npcs){const target=Math.atan2(player.x-npc.x,player.z-npc.z),diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));npc.angle+=diff*(1-Math.exp(-dt*1.5));}
  for(const npc of npcs){const dist=Math.hypot(player.x-npc.x,player.z-npc.z);if(dist<GREETING_RADIUS&&time-npc.last>23&&time>greetUntil+1){lastGreetingDistance=dist;npc.last=time;document.querySelector('#speaker').textContent=npc.name;document.querySelector('#words').textContent=npc.lines[npc.index%npc.lines.length];npc.index++;document.querySelector('#greeting').style.opacity=1;greetUntil=time+7;chime();break;}}
  if(time>greetUntil)document.querySelector('#greeting').style.opacity=0;
@@ -394,45 +379,40 @@ function update(dt){
 }
 function frame(now){
  const dt=clamp((now-last)/1000,0,1/15);last=now;
- if(started){accumulator+=dt;const step=1/60;while(accumulator>=step){previous={x:player.x,y:player.y,z:player.z,yaw:player.yaw};time+=step;update(step);accumulator-=step;}
-  const alpha=accumulator/step;for(const k of ['x','y','z','yaw'])camera[k]=previous[k]+(player[k]-previous[k])*alpha;
+ if(started){accumulator+=dt;const step=1/60;while(accumulator>=step){previous.x=player.x;previous.y=player.y;previous.z=player.z;previous.yaw=player.yaw;time+=step;update(step);accumulator-=step;}
+  const alpha=accumulator/step;for(const k of CAMERA_AXES)camera[k]=previous[k]+(player[k]-previous[k])*alpha;
  }else{time+=dt;resetCameraHistory();}
  render();requestAnimationFrame(frame);
 }requestAnimationFrame(frame);
 
-function setPointer(e){
- if(!pointerOrigin)return;
- const r=canvas.getBoundingClientRect(),radius=clamp(Math.min(r.width,r.height)*.19,64,96);
- let dx=e.clientX-pointerOrigin.x,dy=e.clientY-pointerOrigin.y;
- // Follow only overshoot: turning back after a long swipe responds without retracing the whole swipe.
- const limit=radius+16;
- if(Math.abs(dx)>limit){pointerOrigin.x=e.clientX-Math.sign(dx)*limit;dx=Math.sign(dx)*limit;}
- if(Math.abs(dy)>limit){pointerOrigin.y=e.clientY-Math.sign(dy)*limit;dy=Math.sign(dy)*limit;}
- pointer=dragInput(dx,dy,r.width,r.height);
+function stopMovement(){resetMotion(player);resetCameraHistory();footDistance=0;feetMoving=false;}
+function settleInput(){
+ const i=readMovementInput(gestures.held?gestures.value:null,keys);
+ if(!i.turn)player.yawRate=0;
+ if(!i.forward&&!i.strafe){player.localForward=player.localSide=player.vx=player.vz=player.actualSpeed=player.travelled=player.blockedFor=player.runSeconds=player.surge=0;resetCameraHistory();footDistance=0;feetMoving=false;}
 }
+function releaseCapture(id){if(id!==null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
 canvas.addEventListener('pointerdown',e=>{
- if(!started||e.button>0)return;
- if(e.pointerType==='touch'){
-  activeTouches.add(e.pointerId);
-  if(activeTouches.size>1){multiTouchBlocked=true;release();return;}
-  if(multiTouchBlocked)return;
- }
- if(pointerId!==null)return;
- const r=canvas.getBoundingClientRect();if(e.clientY-r.top<r.height*.5)return;
- e.preventDefault();held=true;pointerId=e.pointerId;pointerOrigin={x:e.clientX,y:e.clientY};pointer.x=pointer.y=0;
- canvas.setPointerCapture(e.pointerId);canvas.focus({preventScroll:true});
- resumeAudio();
+ if(!started)return;
+ const old=gestures.id,claimed=gestures.begin(e,canvas.getBoundingClientRect());
+ if(old!==null&&!gestures.held){stopMovement();releaseCapture(old);}
+ if(!claimed)return;
+ e.preventDefault();canvas.setPointerCapture(e.pointerId);canvas.focus({preventScroll:true});resumeAudio();
 });
-canvas.addEventListener('pointermove',e=>{if(e.pointerId===pointerId){e.preventDefault();setPointer(e);}});
-function release(e){
- if(e&&e.pointerId!==pointerId)return;
- const previous=pointerId;held=false;pointerId=null;pointerOrigin=null;pointer.x=pointer.y=0;
- player.vx=player.vz=player.localForward=player.localSide=player.yawRate=0;resetCameraHistory();actualSpeed=blockedFor=0;footDistance=0;feetMoving=false;
- if(previous!==null&&canvas.hasPointerCapture(previous))canvas.releasePointerCapture(previous);
-}
-function finishPointer(e){if(e.pointerType==='touch'){activeTouches.delete(e.pointerId);if(!activeTouches.size)multiTouchBlocked=false;}release(e);}
-canvas.addEventListener('pointerup',finishPointer);canvas.addEventListener('pointercancel',finishPointer);canvas.addEventListener('lostpointercapture',release);canvas.addEventListener('contextmenu',e=>e.preventDefault());
-const gameKeys=['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight'];addEventListener('keydown',e=>{if(!started&&e.code==='Enter'){begin();return;}if(started&&gameKeys.includes(e.code)){e.preventDefault();keys.add(e.code);}if(e.code==='Escape')resetInput();});addEventListener('keyup',e=>keys.delete(e.code));function resetInput(){keys.clear();release();activeTouches.clear();multiTouchBlocked=false;player.vx=player.vz=0;}addEventListener('blur',resetInput);addEventListener('orientationchange',resetInput);
+canvas.addEventListener('pointermove',e=>{
+ const wasHeld=gestures.held;
+ if(gestures.move(e))e.preventDefault();else if(wasHeld&&!gestures.held)settleInput();
+});
+function finishPointer(e){const owner=gestures.id;if(gestures.end(e)){settleInput();releaseCapture(owner);}}
+// Capture-phase window listeners also see releases outside the canvas after capture was lost.
+addEventListener('pointerup',finishPointer,true);addEventListener('pointercancel',finishPointer,true);
+canvas.addEventListener('lostpointercapture',e=>{if(e.pointerId===gestures.id)resetInput();});
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+const gameKeys=new Set(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight']);
+addEventListener('keydown',e=>{if(!started&&e.code==='Enter'){begin();return;}if(started&&gameKeys.has(e.code)){e.preventDefault();keys.add(e.code);}if(e.code==='Escape')resetInput();});
+addEventListener('keyup',e=>{keys.delete(e.code);settleInput();});
+function resetInput(){keys.clear();const owner=gestures.reset();stopMovement();releaseCapture(owner);}
+addEventListener('blur',resetInput);addEventListener('orientationchange',resetInput);
 function suspendAudio(){if(audioCtx&&audioCtx.state!=='closed')audioCtx.suspend().catch(()=>{});}
 function resumeAudio(){if(audioCtx&&audioCtx.state!=='running'&&audioCtx.state!=='closed')audioCtx.resume().catch(()=>{});}
 document.addEventListener('visibilitychange',()=>{if(document.hidden){resetInput();suspendAudio();}else if(started)resumeAudio();});
@@ -499,4 +479,4 @@ function chime(){if(!audioCtx||audioCtx.state!=='running')return;for(const [i,f]
 function begin(){if(started)return;started=true;greetUntil=time-1;placeUntil=time-2;document.body.classList.add('playing');canvas.focus();audio();document.querySelector('#hint').textContent='指を少し上へ。そのままで歩き続けます。';document.querySelector('#hint').style.opacity=1;setTimeout(()=>document.querySelector('#hint').style.opacity=0,4500);}
 const beginButton=document.querySelector('#begin');beginButton.addEventListener('click',begin);beginButton.disabled=false;beginButton.removeAttribute('aria-busy');
 // Minimal diagnostic state for development; no interface is added during play.
-window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get camera(){return{...camera}},get turningRate(){return player.yawRate},get actualSpeed(){return actualSpeed},get blockedFor(){return blockedFor},get monuments(){return monuments.length},get renderedVertices(){return drawnVertices},get drawCalls(){return drawCalls},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+roadChunks.reduce((n,b)=>n+b.count,0)+world.count+sea.count+scenery.reduce((n,b)=>n+b.count,0)},get places(){return [...shownPlaces]},get islanders(){return npcs.length},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};
+window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get camera(){return{...camera}},get turningRate(){return player.yawRate},get continuousRun(){return player.runSeconds},get surge(){return player.surge},get collisionChecks(){return collisionWorld.checks},get actualSpeed(){return player.actualSpeed},get blockedFor(){return player.blockedFor},get monuments(){return monuments.length},get renderedVertices(){return drawnVertices},get drawCalls(){return drawCalls},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return gestures.held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+roadChunks.reduce((n,b)=>n+b.count,0)+world.count+sea.count+scenery.reduce((n,b)=>n+b.count,0)},get places(){return [...shownPlaces]},get islanders(){return npcs.length},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};

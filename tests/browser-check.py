@@ -31,7 +31,7 @@ with sync_playwright() as p:
   context=browser.new_context(viewport={'width':390,'height':844},is_mobile=True,has_touch=True)
   live=context.new_page();live_errors=[];live.on('pageerror',lambda e:live_errors.append(str(e)))
   response=live.goto(base,wait_until='networkidle',timeout=45000);assert response.ok
-  live.wait_for_function('window.nagi && nagi.release === "2026-10-18-eastern-islands"',timeout=30000)
+  live.wait_for_function('window.nagi && nagi.release === "2026-10-18-movement-core"',timeout=30000)
   icon=live.locator('link[rel="icon"]').get_attribute('href');assert live.request.get(live.evaluate('(p)=>new URL(p,location.href).href',icon)).ok
   live.locator('#begin').tap();live.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden"')
   cdp=context.new_cdp_session(live);anchor=live.evaluate('nagi.position')
@@ -51,7 +51,7 @@ with sync_playwright() as p:
  page.goto(base,wait_until='networkidle');page.wait_for_function('!!window.nagi',timeout=30000)
  assert page.evaluate('!!window.nagi'),errors
 
- assert page.evaluate('nagi.release')=='2026-10-18-eastern-islands'
+ assert page.evaluate('nagi.release')=='2026-10-18-movement-core'
  page.wait_for_function('!!window._nagiVP')
  assert abs(page.evaluate('2*Math.atan(1/_nagiVP[5])*180/Math.PI')-68)<.001
  # Portrait, compact phones, tablet, and notched landscape: no overlap, clipping, or scrolling.
@@ -100,7 +100,7 @@ with sync_playwright() as p:
  page.close()
  # Real CDP touch events exercise pointer capture and cancellation on a mobile viewport.
  context=browser.new_context(viewport={'width':390,'height':844},device_scale_factor=1,is_mobile=True,has_touch=True)
- mobile=context.new_page();mobile.on('pageerror',lambda e:errors.append(str(e)))
+ mobile=context.new_page();mobile.add_init_script("addEventListener('pointerdown',e=>window._lastMovementPointer=e.pointerId,true);");mobile.on('pageerror',lambda e:errors.append(str(e)))
  mobile.goto(base,wait_until='networkidle');mobile.wait_for_function('!!window.nagi',timeout=30000);mobile.screenshot(path=str(root/'mobile.png'))
  cdp=context.new_cdp_session(mobile)
  title=mobile.locator('h1').bounding_box();x=title['x']+30;y=title['y']+30
@@ -165,6 +165,12 @@ with sync_playwright() as p:
  touch('touchEnd');stopped(mobile)
  edge_start=mobile.evaluate('nagi.position');touch('touchStart',340,720);stopped(mobile);touch('touchMove',378,720);mobile.wait_for_function(f'nagi.position.yaw < {edge_start["yaw"]-.4}',timeout=30000);touch('touchEnd');stopped(mobile)
 
+ # Losing pointer capture clears the gesture even if the release lands outside the canvas.
+ lost=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,620);moved(mobile,lost,.4)
+ mobile.evaluate('document.querySelector("#world").releasePointerCapture(window._lastMovementPointer)')
+ # Browsers deliver lostpointercapture on the next pointer event after releasing capture.
+ touch('touchMove',195,618);mobile.wait_for_function('!nagi.dragging');stopped(mobile)
+ touch('touchEnd');anchor=mobile.evaluate('nagi.position');touch('touchStart',195,705);touch('touchMove',195,620);moved(mobile,anchor,.4);touch('touchEnd');stopped(mobile)
  # A second finger cancels movement; pinch cannot zoom or keep the old drag alive.
  pinch_start=mobile.evaluate('nagi.position')
  cdp.send('Input.dispatchTouchEvent',{'type':'touchStart','touchPoints':[{'x':140,'y':700,'id':1}]})

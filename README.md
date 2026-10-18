@@ -2,6 +2,8 @@
 
 淡く物悲しい瀬戸内の小さな島を歩く、一人称探索RPGの基本セットです。依存パッケージや外部CDNは使いません。WebGL対応のブラウザで動作します。
 
+開発の入口：[AGENTS.md](AGENTS.md)（全AIの契約）・[開発手順](docs/DEVELOPMENT.md)・[設計索引](docs/DESIGN.md)・[採用判断](docs/DECISIONS.md)・[残課題](docs/ROADMAP.md)・[検証](docs/QA.md)。packageの現行版はv1.6.0。以下の版別更新記録は保持し、現在の移動基幹は末尾と [docs/movement-core.md](docs/movement-core.md) を参照します。
+
 ## 今回の更新（2026-10-18 / v1.5.0）
 
 - 全速前進は7.8→14.4m/s（約1.85倍）、後退は7.2m/s。PCのShiftでは18m/s。指を少し上へ動かす歩行の速度域を残し、深く倒すほど加速します。停止・旋回・固定画角はそのままです。
@@ -63,6 +65,8 @@ npm run check
 ## 公開を更新する
 
 `dist/` がゲームの正本です。変更後に `npm run build` で単体HTML・アプリアイコン・manifestを生成し、`npm run check` で確認します。リポジトリ直下の `index.html` は `dist/index.html` へ移動する入口です。
+
+変更はIssue→作業ブランチ→PR→CI→リスク別の独立監査→人間の試遊・承認→mainの順に進めます。mainへの直接push・force-push・自動マージは行いません。手順と人間が設定するmain保護は [開発手順](docs/DEVELOPMENT.md) を参照してください。
 
 GitHub Pagesは **main / (root)** から自動公開されています。作業ブランチだけを更新してもテストプレイURLには届きません。mainへの統合後、GitHubのPagesデプロイがそのコミットで成功し、公開画面の `nagi.release` が更新されたことを確認してください。共有先: https://hane-san.github.io/Koitototsukuru/
 

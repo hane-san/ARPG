@@ -4,6 +4,15 @@
 packageはv1.6.0、公開診断値は `2026-10-18-movement-core`。対応：[Issue #5](https://github.com/hane-san/Koitototsukuru/issues/5)。
 今回の参照修正では、追加のGitHub Rename、表示名切替、main統合、Settings操作は行わない。SRPGやcyber-punkを変更・統合しない。
 
+## 確定した現在地（2026-10-19）
+
+- 人間がrepo名を `hane-san/ARPG-01-SkyrimStyle` に変更し、この名前へ合わせて進めるよう指示。repo IDは同じ `1419112929`。旧案 `hane-no-ARPG01` へ追加Renameしない。
+- 準備PR #6と参照修正PR #8は人間が承認・統合済み。今回の基準mainは `6c0e59887742978e9a3e89e1cedaf1fba3840af5`。
+- 現在のPagesは `https://hane-san.github.io/ARPG-01-SkyrimStyle/`。root/distは200、旧 `/ARPG/` と `/Koitototsukuru/` は404。originは現在のGit URLへ更新済み。
+- 表示名「凪の島 — NAGI」、release、技術ID、全配布物、両manifestの起動パス・scope/idは維持する。表示名「蒼ト凪ノ島ノ旅」への切替は別の小PR。
+- main保護は同一repoのActiveなRulesetを維持。PR #6の独立レビュー記録はGitHub上で未確認であり、承認・統合と分けて[統合後レビュー](rename-review-handoff.md)へ引き継ぐ。iPhone実機・ホーム画面・他環境のAI対象選択は人間が確認する。
+- 対応：[Issue #10](https://github.com/hane-san/ARPG-01-SkyrimStyle/issues/10)。以下の2026-10-18の記録とhane-no-*への操作例は旧計画の履歴で、現在の改名指示ではない。現在名から旧案へ変更しない。
+
 ## 実際の改名後の現在地（2026-10-18追記）
 
 - repo ID `1419112929` は現在 `hane-san/ARPG`。準備PR #6は人間が統合済みで、main `5343128a905b8c526c88b595ef42ea3bd96b73ca` のCI・Pages配信も成功している。
@@ -24,9 +33,9 @@ packageはv1.6.0、公開診断値は `2026-10-18-movement-core`。対応：[Iss
 - 失敗CIでマージが止まる実地テスト、独立レビュー、人間の試遊、iPhone実機、実Renameは未実施。設定確認をこれらの完了と扱わない。
 - 両作品の準備は並行して進めるが、本PRの差分・検証・独立レビューはARPGだけを対象とする。[独立レビューへの引継ぎ](rename-review-handoff.md)。実RenameはSRPGの移行安定後とする。
 
-## 新旧の対応
+## 過去の対応（旧案の履歴）
 
-| 項目 | 初期監査時 | 現在 | 当初の目標候補（未実施） |
+| 項目 | 初期監査時 | 2026-10-18時点 | 当初の旧案 |
 |---|---|---|---|
 | Repository | `hane-san/Koitototsukuru` | `hane-san/ARPG` | `hane-san/hane-no-ARPG01` |
 | git remote | `https://github.com/hane-san/Koitototsukuru.git` | `https://github.com/hane-san/ARPG.git` | `https://github.com/hane-san/hane-no-ARPG01.git` |
@@ -95,7 +104,7 @@ npm run check
 CSSの調整が必要なら表示名切替の小PRで扱い、既存の全画面幅テストと実機確認を行う。
 READMEはその小PRで現在の見出しを編集し、研究資料の歴史的な名前は残す。
 
-## 人間が行う順番
+## 初期計画時の順番（現在の改名指示ではない）
 
 ### 改名前
 

@@ -56,7 +56,8 @@ npm run check
 
 ## GitHub Pages / iPhone で遊ぶ
 
-- 公開URL: https://hane-san.github.io/ARPG/ （起動時に `dist/index.html` へ移動）
+- 公開URL: https://hane-san.github.io/ARPG-01-SkyrimStyle/ （起動時に `dist/index.html` へ移動）
+- 2026-10-19確認：現在のrepoは `ARPG-01-SkyrimStyle`。旧 `/ARPG/` も404になったため、現在の新URLでブックマーク・共有リンク・ホーム画面を確認・再登録してください。表示名と内部IDは維持しています。
 - 2026-10-18確認：repoは `Koitototsukuru` から `ARPG` へ改名済み。旧公開URL `https://hane-san.github.io/Koitototsukuru/` は404で、新URLへの自動転送はありません。ブックマーク・共有リンク・ホーム画面は新URLで登録してください。
 - iPhone の Safari で共有 → ホーム画面に追加を選ぶと、能面アイコン「凪の島」として保存できます。アイコンは `assets/nagi-icon-120.png`。
 - `manifest.webmanifest` に起動URLとアイコンを登録済みです。
@@ -69,7 +70,7 @@ npm run check
 
 変更はIssue→作業ブランチ→PR→CI→リスク別の独立監査→人間の試遊・承認→mainの順に進めます。mainへの直接push・force-push・自動マージは行いません。手順と人間が設定するmain保護は [開発手順](docs/DEVELOPMENT.md) を参照してください。
 
-GitHub Pagesは **main / (root)** から自動公開されています。作業ブランチだけを更新してもテストプレイURLには届きません。mainへの統合後、GitHubのPagesデプロイがそのコミットで成功し、公開画面の `nagi.release` が更新されたことを確認してください。共有先: https://hane-san.github.io/ARPG/
+GitHub Pagesは **main / (root)** から自動公開されています。作業ブランチだけを更新してもテストプレイURLには届きません。mainへの統合後、GitHubのPagesデプロイがそのコミットで成功し、公開画面の `nagi.release` が更新されたことを確認してください。共有先: https://hane-san.github.io/ARPG-01-SkyrimStyle/
 
 CSS・ゲームJS・地形JSは起動ごとの同じ更新パラメータで取得し、Service Workerによる固定キャッシュは使いません。改名後のホーム画面は新URLで追加し直し、起動・操作・表示を確認してから旧アイコンを整理してください。
 

@@ -22,8 +22,16 @@
 - 未実装：戦闘・クエスト・セーブ・複雑な永続世界状態。これらの採用・実装を今回の運用導入から推論しない。
 - 未検証：iPhoneのフレームレート・操作感・酔いの個人差。CPU処理単体の計測を端末性能と同一視しない。
 
-## D003 — 改名は別工程（保留）
+## D003 — 改名は別工程（初期の判断・経緯を保持）
 
-- 現行repo：`hane-san/Koitototsukuru`、Pages：`https://hane-san.github.io/Koitototsukuru/`。
+- 初期監査時のrepo：`hane-san/Koitototsukuru`、Pages：`https://hane-san.github.io/Koitototsukuru/`。現在地はD004を参照。
 - 提供マニュアルの目標repo `hane-no-ARPG01`、表示名「蒼ト凪ノ島ノ旅」は別の移行工程。今回、改名・manifest・表示名・URL・内部IDを変更しない。
 - 旧Pages URLの転送を仮定せず、移行時は相対パス、ホーム画面登録、公開入口と保存/設定の有無を別途確認する。
+
+## D004 — 実際の改名後の参照を整備（2026-10-18、確認済みの事実）
+
+- GitHub APIで同一repo ID `1419112929` が `hane-san/ARPG` になったことを確認。人間による準備PR #6の統合後mainは `5343128a905b8c526c88b595ef42ea3bd96b73ca`。本作のCIとPages配信は成功。
+- 現在の公開は `https://hane-san.github.io/ARPG/`。root/distは200、旧 `/Koitototsukuru/` は404。現在参照を修正し、旧名・URL・SHA・runの履歴は保持する。対応：[Issue #7](https://github.com/hane-san/ARPG/issues/7)。
+- 目標候補 `hane-no-ARPG01` と表示名「蒼ト凪ノ島ノ旅」は未反映。今回追加のRename・表示名切替は行わず、技術ID・ゲーム・配布物を維持する。
+- GitHub上でPR #6の独立レビュー記録は確認できない。外部での実施有無は未確認であり、完了扱いにせず [統合後レビュー](rename-review-handoff.md) を依頼する。iPhone実機と外部AIの新repo選択も未検証。
+- main保護は検証専用PR #9でrules=failure / browser=success時のGitHub blockedを実地確認後に閉じ、mainは不変。これはCIによる制限の証拠であり、準備PR #6の独立レビューを代替しない。

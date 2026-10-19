@@ -1,4 +1,4 @@
-"""Local old/new Pages-path rehearsal; no GitHub mutation or real iOS claims."""
+"""Local old/current/planned Pages paths; no GitHub mutation or real iOS claims."""
 import html,json,os,subprocess,threading
 from http.server import SimpleHTTPRequestHandler,ThreadingHTTPServer
 from pathlib import Path
@@ -6,7 +6,7 @@ from urllib.parse import urlsplit,urlunsplit,urljoin
 from playwright.sync_api import sync_playwright
 
 root=Path(__file__).resolve().parents[1]
-prefixes=['/Koitototsukuru/','/hane-no-ARPG01/']
+prefixes=['/Koitototsukuru/','/ARPG/','/hane-no-ARPG01/']
 labels=json.loads(subprocess.check_output(['node','--input-type=module','-e',"import {DISPLAY_NAME} from './display-name.js'; console.log(JSON.stringify(DISPLAY_NAME));"],cwd=root,text=True))
 class Handler(SimpleHTTPRequestHandler):
  def __init__(self,*args,**kwargs):super().__init__(*args,directory=str(root),**kwargs)

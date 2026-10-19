@@ -1,10 +1,22 @@
 # ARPG改名・表示名移行の事前監査と手順
 
-2026-10-18。対象は **hane-san/Koitototsukuruだけ**。初期監査の基準main：`80bfd81bdc4e2ca7259d3a643abbf32d0d8ab93f`。
+2026-10-18。対象は **hane-san/ARPG（旧Koitototsukuru）だけ**。初期監査の基準main：`80bfd81bdc4e2ca7259d3a643abbf32d0d8ab93f`。
 packageはv1.6.0、公開診断値は `2026-10-18-movement-core`。対応：[Issue #5](https://github.com/hane-san/Koitototsukuru/issues/5)。
-今回、GitHubのRename、表示名切替、main統合、Settings操作は行わない。SRPGやcyber-punkを変更・統合しない。
+今回の参照修正では、追加のGitHub Rename、表示名切替、main統合、Settings操作は行わない。SRPGやcyber-punkを変更・統合しない。
+
+## 実際の改名後の現在地（2026-10-18追記）
+
+- repo ID `1419112929` は現在 `hane-san/ARPG`。準備PR #6は人間が統合済みで、main `5343128a905b8c526c88b595ef42ea3bd96b73ca` のCI・Pages配信も成功している。
+- `https://hane-san.github.io/ARPG/` と配下のdistは200。旧 `/Koitototsukuru/` は404で自動転送されない。予定 `/hane-no-ARPG01/` も404で、目標候補の名前への改名は未実施。
+- 表示名は「凪の島 — NAGI」のまま。表示正本・技術ID・両manifestの起動パスとscope/idは維持する。
+- この環境のoriginは `https://github.com/hane-san/ARPG.git` へ更新済み。worktreeはremote設定を共有する。別環境のclone、Codex/Claude/Routineの対象選択、iPhoneホーム画面は人間が確認する。
+- GitHub上でPR #6の独立レビュー記録は確認できない。外部での実施有無は未確認。[統合後レビュー](rename-review-handoff.md) を依頼し、実機・外部AI接続は未検証として残す。
+- main保護は [検証専用PR #9](https://github.com/hane-san/ARPG/pull/9) で実地確認済み。最新mainが直接の親・競合なし・draftでないPRでrules=failure / browser=successとGitHubのmergeable_state=blockedを確認し、PRを閉じた。マージ操作は試みずmain SHAも不変。独立コード監査の代わりにはしない。
+- 対応：[Issue #7](https://github.com/hane-san/ARPG/issues/7)。以下の初期監査・基盤統合時の記録も保持する。
 
 ## 基盤統合後の現在地（2026-10-18追記）
+
+この節は準備PR #6を更新した時点の記録。人間による統合・実Rename後の現在地は上の追記を参照。
 
 - 人間が基盤PR #4をマージ。最新main `2f27f4617603c1f90e161005328aabfa777b039b` を本準備ブランチへ通常のmergeで取り込み、共通契約・テンプレート・既存の記録を保持した。
 - 人間が設定した [main-protection](https://github.com/hane-san/Koitototsukuru/rules/25345749) をAPIで確認。対象はmainのみ、Active、PR必須・承認人数0、GitHub Actionsの `rules` / `browser` 必須・最新mainへの追随あり、削除・force push禁止、bypassなし。
@@ -14,22 +26,24 @@ packageはv1.6.0、公開診断値は `2026-10-18-movement-core`。対応：[Iss
 
 ## 新旧の対応
 
-| 項目 | 現在 | 人間の改名後の目標 |
-|---|---|---|
-| Repository | `hane-san/Koitototsukuru` | `hane-san/hane-no-ARPG01` |
-| git remote | `https://github.com/hane-san/Koitototsukuru.git` | `https://github.com/hane-san/hane-no-ARPG01.git` |
-| Pages入口 | `https://hane-san.github.io/Koitototsukuru/` | `https://hane-san.github.io/hane-no-ARPG01/` |
-| 実ゲーム | `…/Koitototsukuru/dist/index.html` | `…/hane-no-ARPG01/dist/index.html` |
-| 単体HTML | `…/Koitototsukuru/dist/nagi-standalone.html` | `…/hane-no-ARPG01/dist/nagi-standalone.html` |
-| 表示名 | `凪の島 — NAGI` / `凪の島` | `蒼ト凪ノ島ノ旅`（後日の小PR） |
+| 項目 | 初期監査時 | 現在 | 当初の目標候補（未実施） |
+|---|---|---|---|
+| Repository | `hane-san/Koitototsukuru` | `hane-san/ARPG` | `hane-san/hane-no-ARPG01` |
+| git remote | `https://github.com/hane-san/Koitototsukuru.git` | `https://github.com/hane-san/ARPG.git` | `https://github.com/hane-san/hane-no-ARPG01.git` |
+| Pages入口 | `https://hane-san.github.io/Koitototsukuru/`（現在404） | `https://hane-san.github.io/ARPG/` | `https://hane-san.github.io/hane-no-ARPG01/` |
+| 実ゲーム | `…/Koitototsukuru/dist/index.html` | `…/ARPG/dist/index.html` | `…/hane-no-ARPG01/dist/index.html` |
+| 単体HTML | `…/Koitototsukuru/dist/nagi-standalone.html` | `…/ARPG/dist/nagi-standalone.html` | `…/hane-no-ARPG01/dist/nagi-standalone.html` |
+| 表示名 | `凪の島 — NAGI` / `凪の島` | 同じ | `蒼ト凪ノ島ノ旅`（後日の小PR） |
 
 GitHubの旧repo URLの転送と、旧PagesのプロジェクトサイトURLは別。
 **旧Pagesは自動転送されない前提**で、新URLを案内し、ブックマークとホーム画面を再登録する。
-新URLの実公開と改名先の利用可否は、実Rename工程で確認する。
+現在の `/ARPG/` は実公開を確認済み。目標候補 `/hane-no-ARPG01/` の公開と改名先の利用可否は未確認で、追加の実Rename工程として扱う。
 
 ## 改名の影響一覧
 
-| 対象・根拠 | 現状・影響 | 今回 / 改名後の扱い |
+以下は初期監査で収集した記録。現在のrepo・配信先・統合状態は上の追記を優先する。
+
+| 対象・根拠 | 初期監査時の現状・影響 | 準備時 / 改名後の扱い |
 |---|---|---|
 | [README](../README.md) | 旧表示名と旧Pagesリンク。版別の更新・操作記録を含む | 今回は手順へのリンクを追加。実改名後に現在の公開リンク・見出しを更新し、歴史記録は保持 |
 | [root index](../index.html) | title、Apple名称、h1、説明文に旧名。meta refreshとJSで `./dist/index.html` へ移動 | 名前だけ表示正本から同期。二つの相対redirectとフォールバックリンクは維持 |
@@ -86,14 +100,14 @@ READMEはその小PRで現在の見出しを編集し、研究資料の歴史的
 ### 改名前
 
 1. 基盤PR #4は統合済みで、main保護もAPIで適用を確認した。本準備ブランチにも最新mainを取り込み、同じCI定義を維持する。新パス検査は既存ブラウザ入口から呼び出す接続を保持する。
-2. この準備PRをCI・独立レビュー・人間確認後に統合。リスクmedium。自己検証を独立監査として数えない。
-3. SRPGの実際の移行・新URL・実機確認が安定してからARPGの実Renameへ進む。準備PRは両作品で先に用意できる。
+2. 準備PR #6は人間が統合済み。リスクmedium。GitHub上で独立レビュー記録を確認できないため統合後レビューを残す。自己検証を独立監査として数えない。
+3. `ARPG` への改名・現在URLへの配信は済んでいる。追加で目標候補 `hane-no-ARPG01` へ移す場合は、残るレビュー・移行検証とSRPG側の安定確認後に別工程として扱う。
 4. 旧URL、main SHA、package/release、root→dist、開始・一本指移動・停止、ホーム画面の現状を記録する。セーブは未実装なので「進行を復元できた」とは報告しない。
 5. 改名先の空き、進行中PR/CI、main Rulesetの適用、Pages設定を確認。ブラウザデータや旧ホーム画面アイコンを先に消去しない。
 
 ### Renameと直後
 
-1. **人間が** GitHub Settings → General → Repository nameで `Koitototsukuru` を `hane-no-ARPG01` へRename。新repoを作成してコードを複製する工程ではない。
+1. さらに目標候補へ改名する場合に限り、**人間が** GitHub Settings → General → Repository nameで現在の `ARPG` を `hane-no-ARPG01` へRename。現在の公開を確認せずに追加改名しない。新repoを作成してコードを複製する工程ではない。
 2. clone/worktreeの担当と調整し、`git remote set-url origin https://github.com/hane-san/hane-no-ARPG01.git`。新repoのmain・Issue・PR・Actionsへアクセスできることを確認する。
 3. 改名後の修復専用PRでREADMEと基盤PR #4の現在参照、外部AI接続を新repoへ更新。歴史的な観測・run/Issue/PRリンクは保持する。
 4. Pagesをmain / rootで確認・再配信。`https://hane-san.github.io/hane-no-ARPG01/` からdistへ入ることを検証。旧Pagesの自動転送は期待しない。

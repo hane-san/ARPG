@@ -32,3 +32,69 @@ body{position:fixed;inset:0}canvas,.grain,.shade{position:fixed}body *{-webkit-u
  .eyebrow{font-size:9px}h1{font-size:44px;margin:7px 0 10px}h1 span{font-size:8px;margin-top:6px}.intro p{font-size:10.5px;line-height:1.8;margin-bottom:10px}#begin{min-width:190px;min-height:46px;padding:11px 16px;font-size:12px}.notes{font-size:10px}.folio{padding-top:7px}
  #greeting{top:calc(var(--safe-top) + 18%)}#words{font-size:13px;line-height:1.8;margin-top:7px}#hint{bottom:43%}
 }
+
+/* The scenery keeps the centre and the touch area. Text has one quiet channel. */
+.grain{opacity:.025}
+.shade{background:radial-gradient(ellipse,transparent 55%,#52635e12 100%)}
+#place,#greeting{position:fixed;transition:opacity .5s;pointer-events:none}
+#place[aria-hidden="true"],#greeting[aria-hidden="true"]{visibility:hidden}
+#place{top:calc(var(--safe-top) + 26px);left:max(6vw,var(--safe-left));right:auto;text-align:left;color:#2d4840;text-shadow:0 1px 6px #f2f2e6}
+#place span{font-size:16px;letter-spacing:.22em}
+#place small{font-size:8px;letter-spacing:.16em;margin-top:8px}
+#greeting{top:auto;bottom:calc(var(--safe-bottom) + 36px);left:max(6vw,var(--safe-left));right:auto;max-width:min(32rem,88vw);padding:13px 20px;border-left:1px solid #5d786b70;background:linear-gradient(90deg,#edf0e3e8,#edf0e3a6);text-align:left;color:#30483f;filter:none;text-shadow:none}
+#speaker{font:10px/1.6 'Hiragino Kaku Gothic ProN',sans-serif;letter-spacing:.16em;color:#51685e}
+#words{font-size:15px;line-height:1.9;letter-spacing:.05em;margin:5px 0 0;overflow-wrap:anywhere}
+#hint{display:none}
+.playing #arrival{visibility:hidden}
+#open-book{display:none;position:fixed;top:calc(var(--safe-top) + 16px);right:max(4vw,var(--safe-right));z-index:2;min-width:44px;min-height:44px;padding:10px 12px;border:1px solid transparent;background:#e9eddf66;color:#3e574e;font:11px/1.4 'Hiragino Kaku Gothic ProN',sans-serif;letter-spacing:.06em;cursor:pointer;opacity:.7;transition:opacity .4s,background .3s}
+.playing #open-book{display:flex;align-items:center;gap:8px}
+.travelling #open-book:not(:hover):not(:focus-visible){opacity:.27;background:transparent}
+#open-book:hover,#open-book:focus-visible{opacity:1;background:#eef0e6ed;border-color:#69857580}
+#open-book svg{width:17px;height:20px;fill:none;stroke:currentColor;stroke-width:1.3}
+#open-book span{float:none;margin:0}
+button:focus-visible{outline:2px solid #385e4b;outline-offset:4px}
+.reading,.reading canvas{cursor:default}
+.reading #place,.reading #greeting{opacity:0!important}
+#travel-book{width:min(460px,calc(100vw - 36px - var(--safe-left) - var(--safe-right)));max-height:calc(100dvh - 32px - var(--safe-top) - var(--safe-bottom));margin:auto;padding:27px 32px 30px;overflow:auto;overscroll-behavior:contain;touch-action:pan-y;border:1px solid #8c9d8c70;background:#eef0e4;color:#344c41;box-shadow:0 24px 100px #243c3630;cursor:default;scrollbar-width:thin}
+#travel-book::backdrop{background:#344e4559;backdrop-filter:blur(3px)}
+.book-heading{display:flex;align-items:center;justify-content:space-between;gap:20px;font:10px/1.5 sans-serif;letter-spacing:.2em;color:#687e70}
+.book-close{min-width:44px;min-height:44px;padding:5px;border:0;background:transparent;font:26px/1 sans-serif;letter-spacing:0}
+#book-title{font-size:29px;font-weight:400;letter-spacing:.16em;margin:6px 0 16px}
+#book-description{font-size:13px;line-height:2;letter-spacing:.06em;margin:0 0 24px}
+.book-controls{padding:18px 0;border-top:1px solid #7b92722e;border-bottom:1px solid #7b92722e;font-family:'Hiragino Kaku Gothic ProN',sans-serif}
+.book-controls h3{font-size:11px;font-weight:400;letter-spacing:.12em;margin:0 0 10px}
+.book-controls p{font-size:12px;line-height:1.9;margin:0}
+.book-controls .keyboard-notes{margin-top:13px;font-size:10px;line-height:1.9;color:#607264}
+.book-preferences{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:19px 0 0}
+.book-preferences button{min-width:0;min-height:44px;padding:10px 4px;font:11px/1.5 sans-serif;letter-spacing:.04em;background:transparent}
+.book-preferences button[aria-pressed="true"]{background:#dce4d4;border-color:#597360}
+.book-footnote{font:10px/1.8 sans-serif;color:#657968;margin:13px 0 23px}
+#resume-journey{width:100%;min-width:0;background:#e0e7d7}
+@media(max-width:700px),(pointer:coarse){
+ #greeting{top:calc(var(--safe-top) + 70px);bottom:auto;left:max(6vw,var(--safe-left));max-width:88vw;padding:11px 15px}
+ #words{font-size:14px;line-height:1.9}
+ #open-book{right:max(4vw,var(--safe-right));top:calc(var(--safe-top) + 12px)}
+ #open-book span{display:none}
+}
+@media(max-height:650px){
+ #travel-book{padding:15px 24px 21px}
+ #book-description{margin-bottom:15px}
+ .book-controls{padding:13px 0}
+ .book-preferences{margin-top:14px}
+ .book-footnote{margin:10px 0 15px}
+}
+@media(max-height:500px) and (orientation:landscape){
+ #travel-book{width:min(720px,calc(100vw - 36px - var(--safe-left) - var(--safe-right)));display:grid;grid-template-columns:1fr 1.15fr;gap:0 30px}
+ #travel-book:not([open]){display:none}
+ .book-heading{grid-column:1/-1}
+ #book-title{grid-column:1;grid-row:2;font-size:25px;margin-top:0}
+ #book-description{grid-column:1;grid-row:3;font-size:12px;margin-bottom:12px}
+ .book-controls{grid-column:2;grid-row:2/5;align-self:start;padding:0;border:0}
+ .book-controls p{font-size:11px}
+ .book-preferences{grid-column:1;grid-row:4;margin:0}
+ .book-footnote{grid-column:1/-1;margin:13px 0 10px}
+ #resume-journey{grid-column:1/-1;min-height:44px;padding:10px}
+ #place{top:calc(var(--safe-top) + 18px)}
+ #greeting{top:calc(var(--safe-top) + 72px);bottom:auto;max-width:60vw}
+ #words{font-size:13px}
+}

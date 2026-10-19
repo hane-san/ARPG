@@ -23,6 +23,7 @@ Read [docs/DESIGN.md](docs/DESIGN.md), [docs/DECISIONS.md](docs/DECISIONS.md),
 - `npm run check` runs JavaScript syntax and deterministic movement/terrain tests.
 - `npm run dev` serves `dist/` at port 4173. To test the production root redirect, use `python3 -m http.server 4173` at the repository root instead; do not run both on the same port.
 - Existing browser checks: `python3 tests/browser-check.py`, `python3 tests/controls-check.py`, `python3 tests/world-check.py`, `python3 tests/sky-check.py`. See QA for Playwright setup, ports and scope.
+- Smartphone portrait is the primary layout. `python3 tests/journey-check.py` covers the travel book, input recovery, quiet subtitles, safe areas and reduced-motion scenery. Keep gameplay's lower half free of UI.
 - Pages: `https://hane-san.github.io/ARPG/`, main / root, with root `index.html` forwarding to `dist/index.html`. The former `/Koitototsukuru/` Pages URL returns 404; use the current URL.
 
 ## Game-specific invariants

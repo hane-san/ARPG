@@ -13,10 +13,11 @@
 | 継続加速・capture | `python3 tests/controls-check.py` | 実タッチイベントと実移動処理。テスト応答へ一時アクセスを注入 |
 | 広域周回 | `python3 tests/world-check.py` | 既存の北/東周回、渓谷近道、入江、実衝突・地名・描画 |
 | 空の描画 | `python3 tests/sky-check.py` | 実シェーダーの画素、月の移動・消失・一周後復帰 |
+| 縦持ち・旅のUI | `python3 tests/journey-check.py` | しおりの停止・音・フォーカス、通知の競合、風景の文、全字幕の下半分への非侵入、縦横6サイズ、実タッチ、動きを減らす設定 |
 | 短いスモーク | `python3 tests/browser-check.py --smoke` | 起動・release・アイコン・保持入力・移動・停止。完全回帰の代用としない |
 
 各検査はroot配信サーバーを自動起動し、終了時に停止する。ポートはbrowser:4173、controls:4178、world:4174、sky:4176。
-browserだけは `--url http://127.0.0.1:<port>/` で起動済みの別サーバーへ向けられる。
+journeyは4179を使う。browserだけは `--url http://127.0.0.1:<port>/` で起動済みの別サーバーへ向けられる。
 既存devサーバーとのポート重複を避ける。生成されるPNGはgitignore対象でコミットしない。
 `CHROMIUM_PATH` は既存Chromiumの実行パス。省略時は `/usr/bin/chromium`。Playwright導入はゲームの実行依存を増やさない。
 
@@ -25,7 +26,7 @@ browserだけは `--url http://127.0.0.1:<port>/` で起動済みの別サーバ
 `.github/workflows/check.yml` の `Nagi checks` は全PRとpush mainで実行する。
 
 - `rules`：Node 22でbuild、check、生成物の差分がないことを確認。
-- `browser`：Python 3.12 / Playwright 1.57.0 / Chromiumで上記4本の既存ブラウザ検査を実行。スクリーンショットは失敗時だけartifactへ保存。
+- `browser`：Python 3.12 / Playwright 1.57.0 / Chromiumで5本のブラウザ検査を実行。スクリーンショットは失敗時だけartifactへ保存。
 - 権限は `contents: read`。配信・自動マージ・AIモデル呼出し・秘密情報を使う処理は追加しない。既存Pagesのmain / root配信を維持する。
 
 必須化は、PRで実際に成功したチェック名を人間がRulesetへ登録してから。

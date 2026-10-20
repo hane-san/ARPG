@@ -38,6 +38,12 @@ browserだけは `--url http://127.0.0.1:<port>/` で起動済みの別サーバ
 - 既存ActionsはPages配信のみ。[main配信run 39086643706](https://github.com/hane-san/Koitototsukuru/actions/runs/39086643706) は成功。main `protected=false`。管理設定はこの導入で変更していない。
 - 前回の初期監査結果・独立したゲーム確定仕様引継ぎMDは未提供。提供マニュアルと最新mainの資料・コード・テストで、本導入の範囲を確認した。
 
+## 現在名の確認（2026-10-19）
+
+- 現在の正本は `hane-san/ARPG-01-SkyrimStyle`。人間が承認・統合した最新main `6c0e59887742978e9a3e89e1cedaf1fba3840af5` を基準に検証する。現在の公開URLと旧案の区別は[移行記録](rename-preparation.md#確定した現在地2026-10-19)を参照。
+- 既存の移行検査へ現在のrepoパスを追加。過去のパスも回帰用に保持するが、旧案のURLが公開済みという意味ではない。
+- main保護のRulesetとチェック名は改名後も維持されている。以前の失敗CI実地確認の記録も保持する。新しいPRの対象SHAとCI結果はPR本文へ記録する。
+
 ## 人間の試遊・未検証
 
 - 改名後の現在地（2026-10-18）：repoは `hane-san/ARPG`、公開 `/ARPG/` のroot/distは200、旧 `/Koitototsukuru/` は404。main `5343128a905b8c526c88b595ef42ea3bd96b73ca` の [CI](https://github.com/hane-san/ARPG/actions/runs/39137331077) と [Pages配信](https://github.com/hane-san/ARPG/actions/runs/39137387075) は成功。

@@ -1,6 +1,6 @@
 # 共通の開発手順
 
-対象は `hane-san/ARPG`（旧 `hane-san/Koitototsukuru`）。全AIの契約は [AGENTS.md](../AGENTS.md)、
+対象は `hane-san/ARPG-01-SkyrimStyle`（旧 `hane-san/ARPG` / `hane-san/Koitototsukuru`）。全AIの契約は [AGENTS.md](../AGENTS.md)、
 Claude Codeの読込入口は [CLAUDE.md](../CLAUDE.md)。GitHub Docs/Issue/PRとGit履歴で引き継ぐ。
 ゲーム固有の構造は維持し、未共有のチャット・AIの記憶を推測しない。
 
@@ -81,7 +81,7 @@ Linuxの共有ライブラリが不足する環境では、Playwrightの `instal
 
 - **Settings → Actions**：`Nagi checks` を有効にし、PRで `rules` / `browser` が実際に成功することを確認。権限は `contents: read`。
 - **Settings → Rules → Rulesets**：main対象でActive、PR必須、force push禁止、削除制限、必須チェックを設定。成功したPRに表示される正確な `rules` / `browser` のチェック名を選ぶ。個人開発で取得できない他者承認数を必須にしない。利用プランと適用状態を確認し、失敗CIのPRがマージを制限されることを確認する。
-- **Settings → Pages**：現行main / rootと `https://hane-san.github.io/ARPG/` を維持し、マージ後の公開を確認。旧 `/Koitototsukuru/` は404。追加の改名・表示名の移行は別工程。
+- **Settings → Pages**：現行main / rootと `https://hane-san.github.io/ARPG-01-SkyrimStyle/` を維持し、マージ後の公開を確認。旧 `/ARPG/` と `/Koitototsukuru/` は404。追加の改名・表示名の移行は別工程。
 - **Codex / Claude Code**：実repo、Node/Python/ブラウザ、実モデルと権限を確認。初回は手動でIssue→PRの受渡しを試す。
 - **夜間Routineを導入する場合**：最初は1repoの未処理PR。権限・モデル・対象SHA・スケジュールを確認し、結果をPRへ残す。main直接push・自動マージを許可しない。
 

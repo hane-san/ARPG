@@ -9,7 +9,7 @@
 2. 人間がmainのRulesetへ必須チェックを設定し、APIで適用を確認済み。検証専用PR #9でrules=failure / browser=success時のGitHub blockedを実地確認後に閉じ、mainは不変。[現在地・根拠](rename-preparation.md#実際の改名後の現在地2026-10-18追記)。
 3. Codex/SonnetのIssue受渡し、リスク別の独立監査と試遊記録を手動で試す。夜間Routineは未設定。
 4. 改名準備PR #6は人間が統合済み。GitHub上で独立レビュー記録を確認できないため、[統合後レビュー](rename-review-handoff.md) と実機確認を残す。
-5. repoは `ARPG` へ改名済み。[Issue #7](https://github.com/hane-san/ARPG/issues/7) の修正PRで現在参照と `/ARPG/` の検査を整える。旧 `/Koitototsukuru/` は404。新URLのホーム画面登録と外部AIの対象repoを確認する。
+5. 人間が参照修正PR #8を承認・統合し、repoを `ARPG-01-SkyrimStyle` へ改名済み。[現在地](rename-preparation.md#確定した現在地2026-10-19)へ参照と検査を合わせる。旧 `/ARPG/` と `/Koitototsukuru/` は404。現在URLのホーム画面登録と外部AIの対象repoを確認する。
 
 ## 優先する追加検証
 
@@ -20,6 +20,6 @@
 
 ## 別工程・未採用の拡張
 
-- 現在のrepoは `hane-san/ARPG`、公開は `https://hane-san.github.io/ARPG/`。追加のrepo改名と表示名切替は別タスクで実施し、残る移行検証を先に終える。
+- 現在のrepoは `hane-san/ARPG-01-SkyrimStyle`、公開は `https://hane-san.github.io/ARPG-01-SkyrimStyle/`。以前のhane-no-*は旧案として保持し、追加改名しない。表示名切替は別の小PRで扱う。
 - 戦闘・クエスト・セーブ・複雑な世界状態は未実装。採用判断と受入条件をIssueへ残してから別PRで扱う。
 - 別作品の統合や、拡張性だけを目的とする大規模な抽象化は本導入に含めない。

@@ -35,3 +35,10 @@
 - 目標候補 `hane-no-ARPG01` と表示名「蒼ト凪ノ島ノ旅」は未反映。今回追加のRename・表示名切替は行わず、技術ID・ゲーム・配布物を維持する。
 - GitHub上でPR #6の独立レビュー記録は確認できない。外部での実施有無は未確認であり、完了扱いにせず [統合後レビュー](rename-review-handoff.md) を依頼する。iPhone実機と外部AIの新repo選択も未検証。
 - main保護は検証専用PR #9でrules=failure / browser=success時のGitHub blockedを実地確認後に閉じ、mainは不変。これはCIによる制限の証拠であり、準備PR #6の独立レビューを代替しない。
+
+## D005 — 人間が確定した現在のrepo名へ追随（2026-10-19、採用済み）
+
+- 決裁：はねさん。実際の改名とPR承認・統合後に「ここに合わせて進める」と指示。現在の正本は `hane-san/ARPG-01-SkyrimStyle`。以前のhane-no-*は旧案であり追加Renameしない。
+- 人間が統合したPR #6 / #8を含む最新main `6c0e59887742978e9a3e89e1cedaf1fba3840af5` を基準に現在参照とパス検査を修正。対応：[Issue #10](https://github.com/hane-san/ARPG-01-SkyrimStyle/issues/10)。
+- 表示名と技術ID・保存・ゲーム仕様・CI定義を維持。古い名前・URL・SHA・run・判断の記録は履歴として保持する。[現在地](rename-preparation.md#確定した現在地2026-10-19)を優先する。
+- 独立レビューの実施記録とiPhone実機・ホーム画面・外部AIの選択は未確認。人間の承認・統合やCI成功をその証拠に置き換えない。

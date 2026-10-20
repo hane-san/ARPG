@@ -1,6 +1,6 @@
 # 凪の島 — NAGI / AI development contract
 
-This is the canonical `hane-san/ARPG` repository (formerly `hane-san/Koitototsukuru`). Scope work to this game.
+This is the canonical `hane-san/ARPG-01-SkyrimStyle` repository (formerly `hane-san/ARPG` and `hane-san/Koitototsukuru`). Scope work to this game.
 Read [docs/DESIGN.md](docs/DESIGN.md), [docs/DECISIONS.md](docs/DECISIONS.md),
 [docs/DEVELOPMENT.md](docs/DEVELOPMENT.md), [docs/ROADMAP.md](docs/ROADMAP.md),
 [docs/QA.md](docs/QA.md) and the approved issue before editing. Claude Code imports this contract from `CLAUDE.md`.
@@ -23,7 +23,7 @@ Read [docs/DESIGN.md](docs/DESIGN.md), [docs/DECISIONS.md](docs/DECISIONS.md),
 - `npm run check` runs JavaScript syntax and deterministic movement/terrain tests.
 - `npm run dev` serves `dist/` at port 4173. To test the production root redirect, use `python3 -m http.server 4173` at the repository root instead; do not run both on the same port.
 - Existing browser checks: `python3 tests/browser-check.py`, `python3 tests/controls-check.py`, `python3 tests/world-check.py`, `python3 tests/sky-check.py`. See QA for Playwright setup, ports and scope.
-- Pages: `https://hane-san.github.io/ARPG/`, main / root, with root `index.html` forwarding to `dist/index.html`. The former `/Koitototsukuru/` Pages URL returns 404; use the current URL.
+- Pages: `https://hane-san.github.io/ARPG-01-SkyrimStyle/`, main / root, with root `index.html` forwarding to `dist/index.html`. The former `/ARPG/` and `/Koitototsukuru/` Pages URLs return 404; use the current URL.
 
 ## Game-specific invariants
 

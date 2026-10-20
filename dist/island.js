@@ -1,13 +1,14 @@
 const {height,walkable,clamp,smooth,routes,landmarks,distanceToRoute,WORLD_BOUNDS,monuments,expeditionRoute,valleyRoute,easternRoute,saltRoute,MOON_DIRECTION}=await import('./terrain.js'+new URL(import.meta.url).search);
 const {CRUISE_SPEED,footStride,CollisionWorld,circleCollider,boxCollider,GestureInput,createMotionState,resetMotion,stepMotion,readMovementInput}=await import('./movement.js'+new URL(import.meta.url).search);
+const {journeyScenes,landscapeColor,readingSeconds,JourneyNotices}=await import('./journey.js'+new URL(import.meta.url).search);
 const canvas=document.querySelector('#world'),gl=canvas.getContext('webgl',{antialias:true,alpha:false,powerPreference:'high-performance'});
 if(!gl){document.querySelector('#error').hidden=false;document.querySelector('#begin').disabled=true;throw Error('WebGL unavailable');}
 const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
-const vs=`attribute vec3 aP,aN,aC;uniform mat4 uVP;uniform vec3 uOffset,uEye;uniform float uYaw,uTime,uWater;varying vec3 vC,vN,vP;varying float vD;void main(){float c=cos(uYaw),s=sin(uYaw);mat3 r=mat3(c,0.,-s,0.,1.,0.,s,0.,c);vec3 p=r*aP+uOffset;if(uWater>.5)p.y+=.055*sin(p.x*.35+uTime*.45)+.04*cos(p.z*.46-uTime*.38);vP=p;vN=r*aN;vC=aC;vD=length(p-uEye);gl_Position=uVP*vec4(p,1.);}`;
-const fs=`precision highp float;varying vec3 vC,vN,vP;varying float vD;uniform float uTime,uWater;void main(){float light=.79+.21*abs(dot(normalize(vN),normalize(vec3(-.4,.85,.3))));vec3 col=vC*light;if(uWater>.5){float wave=sin(vP.x*.64+vP.z*.75+uTime*.5)*sin(vP.z*.43-uTime*.36);col+=smoothstep(.65,1.,wave)*.015;float gleam=pow(max(0.,sin(vP.x*.1+vP.z*.23)),28.)*.012;col+=gleam;}float fog=1.-exp(-vD*.0019);fog=clamp(fog,0.,.97);col=mix(col,vec3(.77,.824,.815),fog);gl_FragColor=vec4(col,1.);}`;
+const vs=`attribute vec3 aP,aN,aC;uniform mat4 uVP;uniform vec3 uOffset,uEye;uniform float uYaw,uRoll,uTime,uWater;varying vec3 vC,vN,vP;varying float vD;void main(){float c=cos(uYaw),s=sin(uYaw),cr=cos(uRoll),sr=sin(uRoll);mat3 r=mat3(c,0.,-s,0.,1.,0.,s,0.,c)*mat3(cr,sr,0.,-sr,cr,0.,0.,0.,1.);vec3 p=r*aP+uOffset;if(uWater>.5)p.y+=.055*sin(p.x*.35+uTime*.45)+.04*cos(p.z*.46-uTime*.38);vP=p;vN=r*aN;vC=aC;vD=length(p-uEye);gl_Position=uVP*vec4(p,1.);}`;
+const fs=`precision highp float;varying vec3 vC,vN,vP;varying float vD;uniform float uTime,uWater;void main(){float light=.71+.29*abs(dot(normalize(vN),normalize(vec3(-.4,.85,.3))));vec3 col=vC*light;if(uWater>.5){float wave=sin(vP.x*.64+vP.z*.75+uTime*.5)*sin(vP.z*.43-uTime*.36);col+=smoothstep(.65,1.,wave)*.015;float gleam=pow(max(0.,sin(vP.x*.1+vP.z*.23)),28.)*.012;col+=gleam;}float fog=1.-exp(-vD*.00135);fog=clamp(fog,0.,.97);col=mix(col,vec3(.77,.824,.815),fog);gl_FragColor=vec4(col,1.);}`;
 function shader(type,source){const sh=gl.createShader(type);gl.shaderSource(sh,source);gl.compileShader(sh);if(!gl.getShaderParameter(sh,gl.COMPILE_STATUS))throw Error(gl.getShaderInfoLog(sh));return sh;}
 function program(v,f){const p=gl.createProgram();gl.attachShader(p,shader(gl.VERTEX_SHADER,v));gl.attachShader(p,shader(gl.FRAGMENT_SHADER,f));gl.linkProgram(p);if(!gl.getProgramParameter(p,gl.LINK_STATUS))throw Error(gl.getProgramInfoLog(p));return p;}
-const prog=program(vs,fs),loc={};for(const n of ['uVP','uOffset','uEye','uYaw','uTime','uWater'])loc[n]=gl.getUniformLocation(prog,n);
+const prog=program(vs,fs),loc={};for(const n of ['uVP','uOffset','uEye','uYaw','uRoll','uTime','uWater'])loc[n]=gl.getUniformLocation(prog,n);
 const attrs=['aP','aN','aC'].map(n=>gl.getAttribLocation(prog,n));
 const skyProg=program(`attribute vec2 a;varying vec2 v;void main(){v=a*.5+.5;gl_Position=vec4(a,.9999,1.);}`,`precision highp float;varying vec2 v;uniform float yaw,aspect,tanHalfFov;uniform vec3 moonDirection;
 void main(){
@@ -52,6 +53,7 @@ function terrainColor(x,z){
  }
  if(h<1.8)col=pal.sand;
 
+ if(h>=1.8)col=landscapeColor(x,z,col);
  const v=rnd(-.012,.012);return col.map(c=>clamp(c+v,0,1));
 }
 // Clip path ribbons to the exact ground triangles: continuous paths without hovering over hills.
@@ -160,8 +162,18 @@ lantern(3,-96);signpost(-2,-86);sceneryBatch(0,-88,78);
 // Broad landscapes beyond the first cape. Each district has its own culled buffer.
 function quietTree(x,z,s=1,tint=pal.olive){
  const y=height(x,z);cone(x,y,z,.16*s,.09*s,3.1*s,pal.bark,5);
- sphere(x,y+3.3*s,z,1.45*s,.85*s,1.25*s,tint,7,4);
- sphere(x+.7*s,y+3.6*s,z-.5*s,.95*s,.65*s,.9*s,tint,6,3);
+ if(z<-650&&x<150){
+  // Slender, darker silhouettes give the far headland a colder, quieter feel.
+  for(let i=0;i<3;i++)cone(x,y+(1.5+i*.85)*s,z,(1.2-i*.22)*s,.08*s,2.1*s,tintBlend(tint,pal.bark,.24),8);
+ }else if(x<-230&&z<-300){
+  // Salt winds have pressed the harbour pines into low, leaning crowns.
+  branch([x,y+2.1*s,z],[x+1.25*s,y+3.1*s,z+.3*s],.09*s,pal.bark);
+  sphere(x+.8*s,y+3*s,z,1.8*s,.48*s,1.25*s,tint,8,4);
+  sphere(x+1.7*s,y+3.35*s,z+.2*s,1.15*s,.4*s,.85*s,tint,7,3);
+ }else{
+  sphere(x,y+3.3*s,z,1.45*s,.85*s,1.25*s,tint,7,4);
+  sphere(x+.7*s,y+3.6*s,z-.5*s,.95*s,.65*s,.9*s,tint,6,3);
+ }
  addCircle(x,z,.12*s,'tree');
 }
 function shoreHouse(x,z,w=6){
@@ -253,15 +265,18 @@ for(let i=0;i<380;i++){
 }
 for(const [x,z] of [[691,-401],[762,-431],[782,-388]])if(height(x,z)>1&&distanceToRoute(x,z)>9)umbrella(x,z,2,pal.blue);
 lantern(724,-395);sceneryBatch(735,-403,100);
+const movingSails=[];
 function windmill(x,z,h){
  const y=height(x,z);cone(x,y,z,2.8,1.5,h,hex('d7ceba'),10);cone(x,y+h,z,2.3,0,3.5,pal.blue,10);
  const hub=y+h-2;
  sphere(x,hub,z+1.9,.6,.6,.6,pal.stone,8,5);
+ sceneryBatch(x,z,h+18);
  for(let i=0;i<4;i++){
-  const a=i*Math.PI/2+.22,px=r=>x+Math.cos(a)*r,py=r=>hub+Math.sin(a)*r;
-  branch([px(1),py(1),z+2],[px(11),py(11),z+2],.12,pal.bark);
-  quad([px(3),py(3),z+2],[px(10),py(10),z+2],[px(10)-Math.sin(a)*2.2,py(10)+Math.cos(a)*2.2,z+2],[px(3)-Math.sin(a)*1.1,py(3)+Math.cos(a)*1.1,z+2],i%2?pal.cream:hex('c4b6c8'));
+  const a=i*Math.PI/2+.22,px=r=>Math.cos(a)*r,py=r=>Math.sin(a)*r;
+  branch([px(1),py(1),0],[px(11),py(11),0],.12,pal.bark);
+  quad([px(3),py(3),0],[px(10),py(10),0],[px(10)-Math.sin(a)*2.2,py(10)+Math.cos(a)*2.2,0],[px(3)-Math.sin(a)*1.1,py(3)+Math.cos(a)*1.1,0],i%2?pal.cream:hex('c4b6c8'));
  }
+ movingSails.push({...batch(),x,z,r:h+18,offset:new Float32Array([x,hub,z+2]),phase:movingSails.length*.7});
  addCircle(x,z,2.8);
 }
 for(const [x,z,h] of [[878,-507,16],[927,-491,19],[945,-544,15]])windmill(x,z,h);
@@ -338,6 +353,101 @@ islander(902,-504,'風を読むひと',['風がなくても、ここで待って
 islander(1101,-660,'灯を守るひと',['遠くまで、来ましたね。あの浜も同じ海です。','灯台の南には、屋根のない図書室があります。'], 'c9c6b5');
 islander(1086,-745,'頁をめくるひと',['ここにある本は、まだ誰も書いていません。','帰りには、砂の星を数えていってください。'], 'b1b9c0');
 islander(854,-834,'星砂のひと',['一つずつ、波が置いていったのです。','西へ辿れば、塩田を通って元の島へ戻れます。'], 'c7b1b5');
+
+// A little human scale between the monumental landmarks. Generate additions last,
+// so the existing seeded plants, colliders and islanders keep their positions.
+function emptyChair(x,z){
+ const y=height(x,z);
+ box(x,y+.57,z,.9,.11,.85,pal.bark);box(x,y+.6,z-.37,.9,.7,.09,pal.bark);
+ for(const dx of [-.33,.33])for(const dz of [-.3,.3]){
+  const ground=height(x+dx,z+dz);box(x+dx,ground,z+dz,.09,y+.6-ground,.09,pal.stone);
+ }
+ addBox(x,z,.42,.39,'chair');
+}
+for(const scene of journeyScenes){
+ const {x,z,kind}=scene,y=height(x,z);
+ if(kind==='boat'){
+  // Open ribs, a broken seat and an oar pointing to the water.
+  for(const sign of [-1,1]){
+   quad([x,y+.16,z-2.3],[x+sign*1.05,y+.7,z-1.2],[x+sign*1.05,y+.7,z+1.6],[x,y+.2,z+2.4],hex(sign<0?'9a9e89':'b4ad93'));
+   branch([x,y+.16,z-2.3],[x+sign*1.05,y+.7,z-1.2],.055,pal.cream);
+  }
+  for(let i=0;i<6;i++)box(x,y+.25,z-1.4+i*.58,1.45,.07,.16,pal.bark);
+  box(x-.12,y+.5,z+.2,1.7,.08,.45,pal.cream);
+  branch([x+1.3,y+.1,z-1.8],[x+1.6,y+.3,z+2.9],.045,pal.bark);
+  box(x+1.6,y+.25,z+2.6,.32,.06,.8,pal.bark);addBox(x,z,1.05,2.35,'boat');
+ }else if(kind==='chairs'){
+  emptyChair(x-1.1,z);emptyChair(x+1.1,z-.6);
+  box(x,y+.5,z+.8,.7,.1,.6,pal.stone);
+  for(const dx of [-.15,.15])cone(x+dx,y+.6,z+.8,.08,.1,.13,pal.cream,7);
+  addBox(x,z+.8,.32,.27,'table');
+ }else if(kind==='post'){
+  branch([x-1.8,y+.12,z],[x+1.6,y+.3,z+1.2],.13,pal.bark);
+  box(x-.2,y+.38,z+.5,1.1,.16,.55,pal.cream);
+  for(let i=0;i<3;i++)rock(x-1+i*.6,z-1.1,.4+i*.1);
+ }else if(kind==='washing'){
+  for(const dx of [-3.8,3.8]){
+   const py=height(x+dx,z);branch([x+dx,py,z],[x+dx,py+3.5,z],.07,pal.bark);addCircle(x+dx,z,.06,'washing-post');
+  }
+  branch([x-3.8,height(x-3.8,z)+3.3,z],[x+3.8,height(x+3.8,z)+3.3,z],.016,pal.bark);
+  for(let i=0;i<3;i++){
+   const xx=x-2.8+i*2.1,yy=height(xx,z)+3.1;
+   quad([xx,yy,z],[xx+1.4,yy+.06,z],[xx+1.3,yy-1.8,z+.25],[xx+.05,yy-1.8,z+.15],i===1?pal.blue:pal.cream);
+  }
+  box(x+2,y,z+1.3,.7,.4,.6,pal.bark);
+ }else if(kind==='shelter'){
+  for(const dx of [-2.6,2.6])for(const dz of [-1.5,1.5]){
+   const px=x+dx,pz=z+dz,py=height(px,pz);branch([px,py,pz],[px,y+3.7,pz],.1,pal.bark);addCircle(px,pz,.08,'shelter-post');
+  }
+  box(x,y+3.7,z,6,.16,3.8,pal.blue);box(x,y+.55,z-.9,3.6,.14,.65,pal.bark);
+  addBox(x,z-.9,1.75,.3,'bench');
+  box(x+2.5,y+1.2,z,1.1,.9,.09,pal.cream);
+ }else if(kind==='window'){
+  for(const dx of [-2,2]){
+   box(x+dx,y,z,.7,4.7,.8,pal.stone);addBox(x+dx,z,.33,.38,'window');
+  }
+  box(x,y+3.8,z,4.7,.6,.8,pal.cream);box(x,y+.6,z,3.4,.3,.65,pal.stone);
+  addBox(x,z,1.7,.3,'window-sill');
+  for(let i=0;i<5;i++)rock(x-3+i*.8,z+2.2,.3+i*.04);
+ }else if(kind==='shells'){
+  box(x,y,z,1.9,.4,1.3,pal.stone);addBox(x,z,.85,.55,'shell-stone');
+  for(let i=0;i<3;i++)sphere(x-.5+i*.48,y+.44,z,.14,.07,.1,i===1?pal.pink:pal.cream,7,3);
+ }
+ sceneryBatch(x,z,18);
+}
+
+// Small patches break up long uniform verges without filling every empty view.
+// Their spacing follows the route; the road surface and sightlines stay clear.
+let vergeIndex=0;
+for(const points of [expeditionRoute,valleyRoute,easternRoute,saltRoute])for(let i=1;i<points.length;i++){
+ const [ax,az]=points[i-1],[bx,bz]=points[i],length=Math.hypot(bx-ax,bz-az),pieces=Math.ceil(length/65);
+ for(let j=0;j<pieces;j++){
+  const t=(j+.5)/pieces,side=vergeIndex++%2?1:-1;
+  const cx=ax+(bx-ax)*t-(bz-az)/length*side*13,cz=az+(bz-az)*t+(bx-ax)/length*side*13;
+  for(let k=0;k<16;k++){
+   const x=cx+rnd(-6,6),z=cz+rnd(-6,6),y=height(x,z);
+   if(y<.4||distanceToRoute(x,z)<8)continue;
+   const c=x>820?pal.purple:z<-300&&x<0?hex('b6b48a'):pal.olive,h=rnd(.35,.85);
+   tri([x-.16,y,z],[x+.15,y+h,z+.16],[x+.16,y,z],c);
+   tri([x,y,z-.16],[x+.15,y+h,z+.16],[x,y,z+.16],c);
+   if(k%5===0)sphere(x+.15,y+h,z+.16,.11,.065,.11,pal.cream,5,3);
+  }
+  if(vergeIndex%3===0&&height(cx,cz)>.5&&distanceToRoute(cx,cz)>10){
+   for(let k=0;k<3;k++)sphere(cx,height(cx,cz)+.15+k*.22,cz,.48-k*.12,.18,.35-k*.08,pal.stone,6,3);
+  }
+  sceneryBatch(cx,cz,24);
+ }
+}
+
+// A few distant birds give the shore a living scale; no particle carpet or HUD.
+const seabirds=[];
+for(let i=0;i<5;i++){
+ const x=3+i*2.2,y=i%2*.7,z=i*1.5;
+ tri([x-1.8,y+.25,z],[x,y,z+.3],[x-.2,y,z-.15],pal.cream);
+ tri([x+.2,y,z-.15],[x,y,z+.3],[x+1.8,y+.2,z],pal.cream);
+}
+const birdMesh=batch();
+for(const [x,z,y] of [[-66,14,30],[-345,-330,65],[1105,-680,85]])seabirds.push({x,z,y,r:65,offset:new Float32Array(3)});
 const CAMERA_FOV=68,RUN_SPEED=CRUISE_SPEED,GREETING_RADIUS=4.8;
 const collisionWorld=new CollisionWorld(obstacles,{height,walkable});
 const player=createMotionState(8,30,.25);player.y=height(8,30)+1.65;
@@ -345,12 +455,15 @@ const camera={x:player.x,y:player.y,z:player.z,yaw:player.yaw};
 let previous={...camera},accumulator=0;
 function resetCameraHistory(){Object.assign(camera,{x:player.x,y:player.y,z:player.z,yaw:player.yaw});Object.assign(previous,camera);accumulator=0;}
 
-let started=false,time=0,last=performance.now(),gestures=new GestureInput(),keys=new Set(),greetUntil=0,placeUntil=0,shownPlaces=new Set(),lastGreetingDistance=null;
+let started=false,paused=false,muted=false,time=0,last=performance.now(),gestures=new GestureInput(),keys=new Set(),shownPlaces=new Set(),lastGreetingDistance=null;
+const notices=new JourneyNotices(),seenScenes=new Set(),sceneDwell=new Map();
+const placeNode=document.querySelector('#place'),greetingNode=document.querySelector('#greeting'),travelBook=document.querySelector('#travel-book');
+let noticeContent=null,paintedNotice=null,previousMovement=false;
 function resize(){const d=Math.min(devicePixelRatio||1,1.5),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}addEventListener('resize',resize);resize();
 function vp(){const f=1/Math.tan(CAMERA_FOV*Math.PI/360),aspect=canvas.width/canvas.height,n=.18,far=2600,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*camera.x+s*camera.z,-camera.y,-s*camera.x-c*camera.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
 const DRAW_ORIGIN=[0,0,0],WORLD_SCENERY_BOUNDS={x:0,z:-25,r:100},CAMERA_AXES=['x','y','z','yaw'];
 let drawnVertices=0,drawCalls=0,viewCos=1,viewSin=0,viewTangent=1,viewPadding=1;
-function draw(b,offset=DRAW_ORIGIN,yaw=0,water=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);drawnVertices+=b.count;drawCalls++;}
+function draw(b,offset=DRAW_ORIGIN,yaw=0,water=0,roll=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uRoll,roll);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);drawnVertices+=b.count;drawCalls++;}
 function visible(b,range=1450){
  const dx=b.x-camera.x,dz=b.z-camera.z,d=Math.hypot(dx,dz);if(d>=range+b.r)return false;if(d<b.r)return true;
  const forward=-dx*viewSin-dz*viewCos,side=dx*viewCos-dz*viewSin;
@@ -364,24 +477,69 @@ function render(){
  draw(distant);draw(sea,DRAW_ORIGIN,0,1);for(const chunk of terrainChunks)if(visible(chunk))draw(chunk);gl.enable(gl.POLYGON_OFFSET_FILL);gl.polygonOffset(-1,-1);for(const chunk of roadChunks)if(visible(chunk))draw(chunk);gl.disable(gl.POLYGON_OFFSET_FILL);draw(foam);
  if(visible(WORLD_SCENERY_BOUNDS,650))draw(world);
  for(const chunk of scenery)if(visible(chunk))draw(chunk);draw(clouds);
+ for(const sail of movingSails)if(visible(sail))draw(sail,sail.offset,0,0,reduced?sail.phase:time*.065+sail.phase);
+ for(const flock of seabirds){
+  if(!visible(flock,550))continue;
+  const phase=reduced?0:time*.055;
+  flock.offset[0]=flock.x+Math.sin(phase)*40;flock.offset[1]=flock.y+(reduced?0:Math.sin(phase*2)*2);flock.offset[2]=flock.z+Math.cos(phase)*30;
+  draw(birdMesh,flock.offset,-phase,0,reduced?0:Math.sin(phase)*.15);
+ }
  for(const npc of npcs){if(!visible(npc,420))continue;draw(npc.mesh,npc.offset,npc.angle);}
 }
 
+function showNotice(kind,key,title,words,duration){
+ if(!notices.show(kind,key,time,duration))return false;
+ noticeContent={kind,key,title,words};return true;
+}
+function paintNotices(){
+ const active=notices.current(time),identity=active?active.kind+':'+active.key:null;
+ if(identity===paintedNotice)return;
+ paintedNotice=identity;
+ const isPlace=active?.kind==='place',isWords=!!active&&!isPlace;
+ placeNode.style.opacity=isPlace?1:0;placeNode.setAttribute('aria-hidden',String(!isPlace));
+ greetingNode.style.opacity=isWords?1:0;greetingNode.setAttribute('aria-hidden',String(!isWords));
+ if(!active)return;
+ if(isPlace){document.querySelector('#place-jp').textContent=noticeContent.title;document.querySelector('#place-en').textContent=noticeContent.words;}
+ else{document.querySelector('#speaker').textContent=noticeContent.title;document.querySelector('#words').textContent=noticeContent.words;}
+}
+const announcedPlaces=new Set();
 function update(dt){
  const input=readMovementInput(gestures.held?gestures.value:null,keys);
  stepMotion(player,input,dt,collisionWorld);
  updateFootsteps(player.travelled,dt);
- for(const npc of npcs){const target=Math.atan2(player.x-npc.x,player.z-npc.z),diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));npc.angle+=diff*(1-Math.exp(-dt*1.5));}
- for(const npc of npcs){const dist=Math.hypot(player.x-npc.x,player.z-npc.z);if(dist<GREETING_RADIUS&&time-npc.last>23&&time>greetUntil+1){lastGreetingDistance=dist;npc.last=time;document.querySelector('#speaker').textContent=npc.name;document.querySelector('#words').textContent=npc.lines[npc.index%npc.lines.length];npc.index++;document.querySelector('#greeting').style.opacity=1;greetUntil=time+7;chime();break;}}
- if(time>greetUntil)document.querySelector('#greeting').style.opacity=0;
- for(const [name,en,x,z,r] of landmarks)if(!shownPlaces.has(name)&&Math.hypot(player.x-x,player.z-z)<r&&time>placeUntil-2.2){shownPlaces.add(name);document.querySelector('#place-jp').textContent=name;document.querySelector('#place-en').textContent=en;document.querySelector('#place').style.opacity=1;placeUntil=time+4;break;}
- if(time>placeUntil)document.querySelector('#place').style.opacity=0;
+ for(const npc of npcs){
+  const dist=Math.hypot(player.x-npc.x,player.z-npc.z);
+  if(dist>14){npc.encounter=false;continue;}
+  const target=Math.atan2(player.x-npc.x,player.z-npc.z),diff=Math.atan2(Math.sin(target-npc.angle),Math.cos(target-npc.angle));
+  npc.angle+=diff*(1-Math.exp(-dt*1.5));
+  const words=npc.lines[npc.index%npc.lines.length];
+  if(dist<GREETING_RADIUS&&!npc.encounter&&time-npc.last>23&&showNotice('greeting',npc.name,npc.name,words,readingSeconds(words))){
+   lastGreetingDistance=dist;npc.last=time;npc.encounter=true;npc.index++;chime();
+  }
+ }
+ for(const [name,en,x,z,r] of landmarks){
+  if(Math.hypot(player.x-x,player.z-z)>=r)continue;
+  shownPlaces.add(name);
+  if(!announcedPlaces.has(name)&&showNotice('place',name,name,en,3.8))announcedPlaces.add(name);
+ }
+ for(const scene of journeyScenes){
+  if(seenScenes.has(scene.id))continue;
+  const dx=scene.x-player.x,dz=scene.z-player.z,dist=Math.hypot(dx,dz);
+  const facing=(-Math.sin(player.yaw)*dx-Math.cos(player.yaw)*dz)/Math.max(dist,.01);
+  if(dist<scene.radius&&facing>.45&&player.actualSpeed<.5&&!gestures.held&&keys.size===0){
+   const dwell=(sceneDwell.get(scene.id)||0)+dt;sceneDwell.set(scene.id,dwell);
+   if(dwell>1.6&&showNotice('scene',scene.id,scene.name,scene.words,readingSeconds(scene.words)))seenScenes.add(scene.id);
+  }else sceneDwell.delete(scene.id);
+ }
+ const moving=player.actualSpeed>1;
+ if(moving!==previousMovement){previousMovement=moving;document.body.classList.toggle('travelling',moving);}
+ paintNotices();
 }
 function frame(now){
  const dt=clamp((now-last)/1000,0,1/15);last=now;
- if(started){accumulator+=dt;const step=1/60;while(accumulator>=step){previous.x=player.x;previous.y=player.y;previous.z=player.z;previous.yaw=player.yaw;time+=step;update(step);accumulator-=step;}
+ if(started&&!paused){accumulator+=dt;const step=1/60;while(accumulator>=step){previous.x=player.x;previous.y=player.y;previous.z=player.z;previous.yaw=player.yaw;time+=step;update(step);accumulator-=step;}
   const alpha=accumulator/step;for(const k of CAMERA_AXES)camera[k]=previous[k]+(player[k]-previous[k])*alpha;
- }else{time+=dt;resetCameraHistory();}
+ }else if(!started){time+=dt;resetCameraHistory();}
  render();requestAnimationFrame(frame);
 }requestAnimationFrame(frame);
 
@@ -393,7 +551,7 @@ function settleInput(){
 }
 function releaseCapture(id){if(id!==null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
 canvas.addEventListener('pointerdown',e=>{
- if(!started)return;
+ if(!started||paused)return;
  const old=gestures.id,claimed=gestures.begin(e,canvas.getBoundingClientRect());
  if(old!==null&&!gestures.held){stopMovement();releaseCapture(old);}
  if(!claimed)return;
@@ -409,12 +567,50 @@ addEventListener('pointerup',finishPointer,true);addEventListener('pointercancel
 canvas.addEventListener('lostpointercapture',e=>{if(e.pointerId===gestures.id)resetInput();});
 canvas.addEventListener('contextmenu',e=>e.preventDefault());
 const gameKeys=new Set(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','ArrowDown','ArrowLeft','ArrowRight','ShiftLeft','ShiftRight']);
-addEventListener('keydown',e=>{if(!started&&e.code==='Enter'){begin();return;}if(started&&gameKeys.has(e.code)){e.preventDefault();keys.add(e.code);}if(e.code==='Escape')resetInput();});
+addEventListener('keydown',e=>{
+ if(!started&&e.code==='Enter'){begin();return;}
+ if(started&&e.code==='KeyH'&&!e.repeat){e.preventDefault();if(paused)closeBook();else openBook();return;}
+ if(paused)return;
+ if(started&&gameKeys.has(e.code)&&document.activeElement===canvas){
+  e.preventDefault();
+  // A physically held key can keep repeating after a dialog or blur cleared it.
+  // Only a fresh press may start movement again.
+  if(e.repeat&&!keys.has(e.code))return;
+  keys.add(e.code);resumeAudio();
+ }
+ if(e.code==='Escape')resetInput();
+});
 addEventListener('keyup',e=>{keys.delete(e.code);settleInput();});
 function resetInput(){keys.clear();const owner=gestures.reset();stopMovement();releaseCapture(owner);}
 addEventListener('blur',resetInput);addEventListener('orientationchange',resetInput);
+canvas.addEventListener('blur',resetInput);
 function suspendAudio(){if(audioCtx&&audioCtx.state!=='closed')audioCtx.suspend().catch(()=>{});}
-function resumeAudio(){if(audioCtx&&audioCtx.state!=='running'&&audioCtx.state!=='closed')audioCtx.resume().catch(()=>{});}
+function resumeAudio(){if(!paused&&!muted&&!document.hidden&&audioCtx&&audioCtx.state!=='running'&&audioCtx.state!=='closed')audioCtx.resume().catch(()=>{});}
+function openBook(){
+ if(!started||paused)return;
+ paused=true;resetInput();notices.clear();paintNotices();suspendAudio();document.body.classList.add('reading');travelBook.showModal();
+}
+function closeBook(){
+ if(!paused)return;
+ travelBook.close();paused=false;resetInput();last=performance.now();document.body.classList.remove('reading');canvas.focus({preventScroll:true});resumeAudio();
+}
+document.querySelector('#open-book').addEventListener('click',openBook);
+document.querySelector('#open-book').addEventListener('pointerdown',resetInput);
+for(const id of ['close-book','resume-journey'])document.querySelector('#'+id).addEventListener('click',closeBook);
+travelBook.addEventListener('cancel',e=>{e.preventDefault();closeBook();});
+travelBook.addEventListener('keydown',e=>{
+ if(e.code!=='Tab')return;
+ const buttons=travelBook.querySelectorAll('button:not(:disabled)'),first=buttons[0],lastButton=buttons[buttons.length-1];
+ if(e.shiftKey&&document.activeElement===first){e.preventDefault();lastButton.focus();}
+ else if(!e.shiftKey&&document.activeElement===lastButton){e.preventDefault();first.focus();}
+});
+document.querySelector('#sound-toggle').addEventListener('click',e=>{
+ muted=!muted;e.currentTarget.setAttribute('aria-pressed',String(muted));e.currentTarget.textContent=muted?'音を聴く':'音を休める';
+ if(muted)suspendAudio();else resumeAudio();
+});
+document.querySelector('#subtitles-toggle').addEventListener('click',e=>{
+ notices.setEnabled(!notices.enabled);paintNotices();e.currentTarget.setAttribute('aria-pressed',String(!notices.enabled));e.currentTarget.textContent=notices.enabled?'字幕を休める':'字幕を読む';
+});
 document.addEventListener('visibilitychange',()=>{if(document.hidden){resetInput();suspendAudio();}else if(started)resumeAudio();});
 addEventListener('pagehide',()=>{resetInput();suspendAudio();});
 addEventListener('pageshow',()=>{resetInput();last=performance.now();});
@@ -476,7 +672,7 @@ function updateFootsteps(distance,dt){
  if(footDistance>=stride){footDistance%=stride;footstep(surfaceAt(player.x,player.z),speed);}
 }
 function chime(){if(!audioCtx||audioCtx.state!=='running')return;for(const [i,f] of [523.25,783.99].entries()){const o=audioCtx.createOscillator(),g=audioCtx.createGain(),t=audioCtx.currentTime+i*.15;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.035,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+2);o.connect(g);g.connect(master);o.start(t);o.stop(t+2);}}
-function begin(){if(started)return;started=true;greetUntil=time-1;placeUntil=time-2;document.body.classList.add('playing');canvas.focus();audio();document.querySelector('#hint').textContent='指を少し上へ。そのままで歩き続けます。';document.querySelector('#hint').style.opacity=1;setTimeout(()=>document.querySelector('#hint').style.opacity=0,4500);}
+function begin(){if(started)return;started=true;notices.clear();document.body.classList.add('playing');canvas.focus();audio();}
 const beginButton=document.querySelector('#begin');beginButton.addEventListener('click',begin);beginButton.disabled=false;beginButton.removeAttribute('aria-busy');
 // Minimal diagnostic state for development; no interface is added during play.
-window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get camera(){return{...camera}},get turningRate(){return player.yawRate},get continuousRun(){return player.runSeconds},get surge(){return player.surge},get collisionChecks(){return collisionWorld.checks},get actualSpeed(){return player.actualSpeed},get blockedFor(){return player.blockedFor},get monuments(){return monuments.length},get renderedVertices(){return drawnVertices},get drawCalls(){return drawCalls},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return gestures.held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+roadChunks.reduce((n,b)=>n+b.count,0)+world.count+sea.count+scenery.reduce((n,b)=>n+b.count,0)},get places(){return [...shownPlaces]},get islanders(){return npcs.length},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};
+window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get camera(){return{...camera}},get turningRate(){return player.yawRate},get continuousRun(){return player.runSeconds},get surge(){return player.surge},get collisionChecks(){return collisionWorld.checks},get actualSpeed(){return player.actualSpeed},get blockedFor(){return player.blockedFor},get monuments(){return monuments.length},get renderedVertices(){return drawnVertices},get drawCalls(){return drawCalls},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return gestures.held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+roadChunks.reduce((n,b)=>n+b.count,0)+world.count+sea.count+scenery.reduce((n,b)=>n+b.count,0)+movingSails.reduce((n,b)=>n+b.count,0)+birdMesh.count},get places(){return [...shownPlaces]},get islanders(){return npcs.length},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};

@@ -16,13 +16,23 @@
 <div class="grain" aria-hidden="true"></div><div class="shade" aria-hidden="true"></div>
 <section id="arrival" aria-label="島へ渡る">
 <div class="edition">A SMALL ISLAND, SOMEWHERE IN SETOUCHI</div>
-<div class="intro"><div class="eyebrow">ひとりで歩く、小さな異郷。</div><h1>凪の島<span>N A G I</span></h1><p>潮がひいて、道ができた。<br>まだ名前を知らない、あなたのために。</p><button id="begin" type="button" disabled aria-busy="true">島へ渡る <span aria-hidden="true">⟶</span></button></div>
-<div class="notes"><span>歩きかた</span><p>画面の下半分で、指を少し上へ。そのままで前進。<br>下で後退、左右で旋回。斜めで曲がりながら進む。<br>大きく上へ動かすと走る。離すと停止。PCは W A S D · ← →。</p><small>視点の上下・揺れなし · 足音と海の音が流れます</small></div>
+<div class="intro"><div class="eyebrow">ひとりで歩く、小さな異郷。</div><h1>凪の島<span>N A G I</span></h1><p>潮がひいて、道ができた。<br>誰かのいた風景を、もう少し歩こう。</p><button id="begin" type="button" disabled aria-busy="true">島へ渡る <span aria-hidden="true">⟶</span></button></div>
+<div class="notes"><span>歩きかた</span><p>画面の下半分で、指を少し上へ。そのままで前進。<br>左右で旋回。離すと停止。PCは W A S D · ← →。</p><small>音と操作は、旅の途中でも「しおり」から。</small></div>
 <div class="folio">凪 ／ 小さな島の習作 <i>01</i></div>
 </section>
-<div id="place" aria-live="polite"><span id="place-jp"></span><small id="place-en"></small></div>
-<div id="greeting" role="status" aria-live="polite"><span id="speaker"></span><p id="words"></p></div>
-<div id="hint">ゆっくり、どうぞ。</div>
+<button id="open-book" type="button" aria-label="旅のしおり：操作・音・字幕" aria-haspopup="dialog" aria-controls="travel-book"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 3h12v18l-6-4-6 4z"/></svg><span>しおり</span></button>
+<dialog id="travel-book" aria-labelledby="book-title" aria-describedby="book-description">
+ <div class="book-heading"><span>道の途中で</span><button id="close-book" class="book-close" type="button" aria-label="しおりを閉じて旅を続ける" autofocus>×</button></div>
+ <h2 id="book-title">旅のしおり</h2>
+ <p id="book-description">急がなくて、だいじょうぶ。<br>立ち止まった景色も、旅のひとつ。</p>
+ <div class="book-controls"><h3>歩く・見渡す</h3><p>画面の下半分に指を置き、少し上へ。<br>そのまま保持すると歩き続けます。<br>下で後退、左右で旋回。離すと止まります。</p><p class="keyboard-notes">PC：W A S D で移動 ／ ← → で旋回<br>Shift で走る ／ H でしおり ／ Esc で入力解除</p></div>
+ <div class="book-preferences"><button id="sound-toggle" type="button" aria-pressed="false">音を休める</button><button id="subtitles-toggle" type="button" aria-pressed="false">字幕を休める</button></div>
+ <p class="book-footnote">しおりを開いている間、歩みと音は止まります。</p>
+ <button id="resume-journey" type="button">旅をつづける <span aria-hidden="true">⟶</span></button>
+</dialog>
+<div id="place" aria-live="polite" aria-hidden="true"><span id="place-jp"></span><small id="place-en"></small></div>
+<div id="greeting" role="status" aria-live="polite" aria-hidden="true"><span id="speaker"></span><p id="words"></p></div>
+<div id="hint" aria-hidden="true"></div>
 <div id="error" role="alert" hidden>この島には WebGL が必要です。WebGL に対応したブラウザで開いてください。</div>
 <script type="module">
  const fail=()=>{const error=document.querySelector('#error');if(error.hidden){error.textContent='島を読み込めませんでした。ページを開き直してください。';error.hidden=false;}document.querySelector('#begin').disabled=true;};

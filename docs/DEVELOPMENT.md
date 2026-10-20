@@ -58,6 +58,7 @@ export CHROMIUM_PATH="$(/tmp/nagi-qa/bin/python -c 'from playwright.sync_api imp
 /tmp/nagi-qa/bin/python tests/controls-check.py
 /tmp/nagi-qa/bin/python tests/world-check.py
 /tmp/nagi-qa/bin/python tests/sky-check.py
+/tmp/nagi-qa/bin/python tests/journey-check.py
 ```
 
 Linuxの共有ライブラリが不足する環境では、Playwrightの `install --with-deps chromium` を使う。

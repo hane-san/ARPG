@@ -3,6 +3,8 @@
 @AGENTS.md
 @docs/DEVELOPMENT.md
 
+For PR supervision (reviews, CI fixes, conflicts, overnight rounds) follow `.claude/skills/steward/SKILL.md`.
+
 The same project contract applies in ChatGPT/Codex and Claude Code. Use the current
 repository, approved GitHub documentation and issue as the source of truth; never
 assume another assistant's private memory or unseen chat history.

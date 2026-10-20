@@ -58,6 +58,7 @@ export CHROMIUM_PATH="$(/tmp/nagi-qa/bin/python -c 'from playwright.sync_api imp
 /tmp/nagi-qa/bin/python tests/controls-check.py
 /tmp/nagi-qa/bin/python tests/world-check.py
 /tmp/nagi-qa/bin/python tests/sky-check.py
+/tmp/nagi-qa/bin/python tests/journey-check.py
 ```
 
 Linuxの共有ライブラリが不足する環境では、Playwrightの `install --with-deps chromium` を使う。
@@ -86,3 +87,9 @@ Linuxの共有ライブラリが不足する環境では、Playwrightの `instal
 - **夜間Routineを導入する場合**：最初は1repoの未処理PR。権限・モデル・対象SHA・スケジュールを確認し、結果をPRへ残す。main直接push・自動マージを許可しない。
 
 文書・PRの作成だけで、保護設定やRoutineが有効になったとは扱わない。
+
+## Claude Codeによる監督・夜間巡回
+
+Codex/GPT等が作ったPRをClaude Codeが受け取るときの手順（競合→CI→差分監査→1件の記録コメント→人間待ち）と、夜間巡回の範囲は `.claude/skills/steward/SKILL.md`。クラウドのセッションでは `.claude/hooks/session-start.sh` がブラウザ検査の依存を用意する。マージ・承認・Settings変更はしない。
+
+明け方の巡回：毎日4:12（日本時間）に、専用セッション「明け方の監督巡回（独立監査担当）」が5つのリポジトリのPRを、このスキルの手順で見回る（2026-10-20 採用）。

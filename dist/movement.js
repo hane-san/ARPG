@@ -45,7 +45,8 @@ export class GestureInput {
  }
  move(e){
   if(e.pointerId!==this.id)return false;
-  if(e.pointerType==='mouse'&&e.buttons===0){this.end(e);return false;}
+  // Only the primary button starts a drag; a chorded release arrives as pointermove, not pointerup.
+  if(e.pointerType==='mouse'&&(e.buttons&1)===0){this.end(e);return false;}
   const {width,height}=this.bounds,overshoot=limit(Math.min(width,height)*.19,64,96)+16;
   let dx=e.clientX-this.origin.x,dy=e.clientY-this.origin.y;
   if(Math.abs(dx)>overshoot){this.origin.x=e.clientX-Math.sign(dx)*overshoot;dx=Math.sign(dx)*overshoot;}

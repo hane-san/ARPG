@@ -65,6 +65,7 @@ git diff --exit-code -- dist/ .nojekyll   # 生成物をコミットし忘れて
 /tmp/nagi-qa/bin/python tests/controls-check.py
 /tmp/nagi-qa/bin/python tests/world-check.py
 /tmp/nagi-qa/bin/python tests/sky-check.py
+/tmp/nagi-qa/bin/python tests/journey-check.py
 ```
 ソースを変えたら `npm run build` の生成物（`dist/nagi-standalone.html` など）も同じコミットに含める。生成物を手で直さない。
 

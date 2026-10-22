@@ -128,11 +128,13 @@ python tests/world-check.py
 npm run build
 npm run check
 python tests/browser-check.py
+python tests/controls-check.py
 python tests/world-check.py
 python tests/sky-check.py
+python tests/journey-check.py
 ```
 
-`sky-check.py` は実際の空シェーダーの画素を読み、旋回したときに月が移動・画面外へ消失・一周後に復帰することを確認します。`world-check.py` は広域の周回・渓谷の近道・浜への帰還を実際の移動と衝突処理で検証します。QA用のアクセスはテスト中の応答にだけ追加します。
+`sky-check.py` は実際の空シェーダーの画素を読み、旋回したときに月が移動・画面外へ消失・一周後に復帰することを確認します。`world-check.py` は広域の周回・渓谷の近道・浜への帰還を実際の移動と衝突処理で検証します。`journey-check.py` は縦持ちの旅のしおり・入力の解除・字幕・安全領域・動きを減らす設定を確認します。QA用のアクセスはテスト中の応答にだけ追加します。
 
 ブラウザのモバイル相当環境で検証しています。iPhone実機のフレームレートや体感、酔いの個人差は未検証です。
 

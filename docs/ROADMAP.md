@@ -7,7 +7,7 @@
 
 1. [Issue #3](https://github.com/hane-san/Koitototsukuru/issues/3) / PR #4で契約・文書索引・テンプレート・PR CIをmainへ導入済み。統合後CI・Pagesも成功。
 2. 人間がmainのRulesetへ必須チェックを設定し、APIで適用を確認済み。検証専用PR #9でrules=failure / browser=success時のGitHub blockedを実地確認後に閉じ、mainは不変。[現在地・根拠](rename-preparation.md#実際の改名後の現在地2026-10-18追記)。
-3. Codex/SonnetのIssue受渡し、リスク別の独立監査と試遊記録を手動で試す。夜間Routineは未設定。
+3. Codex/SonnetのIssue受渡し、リスク別の独立監査と試遊記録を手動で試す。2026-10-20から、明け方4:12（日本時間）の監督巡回が専用セッションで動いている（[DECISIONS](DECISIONS.md)）。マージ・承認は人間のまま。
 4. 改名準備PR #6は人間が統合済み。GitHub上で独立レビュー記録を確認できないため、[統合後レビュー](rename-review-handoff.md) と実機確認を残す。
 5. 人間が参照修正PR #8を承認・統合し、repoを `ARPG-01-SkyrimStyle` へ改名済み。[現在地](rename-preparation.md#確定した現在地2026-10-19)へ参照と検査を合わせる。旧 `/ARPG/` と `/Koitototsukuru/` は404。現在URLのホーム画面登録と外部AIの対象repoを確認する。
 

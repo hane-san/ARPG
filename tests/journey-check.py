@@ -202,4 +202,46 @@ with sync_playwright() as p:
         assert phone.evaluate('nagi.speed') == 0
     assert not errors, errors
     print(json.dumps({'mobileLayouts':len(layouts),'portraitCaptions':len(captions),'lowerHalfUnobstructed':True,'dialogTouchLeak':False,'errors':errors}), flush=True)
+
+    # A lost WebGL context must not leave an invisible walk running: stop, quiet the audio and ask for a reload.
+    lose = 'window._lose=document.querySelector("#world").getContext("webgl").getExtension("WEBGL_lose_context");_lose.loseContext()'
+    lost = browser.new_page(viewport={'width': 390, 'height': 844})
+    lost.on('pageerror', lambda error: errors.append(str(error)))
+    lost.goto(base, wait_until='networkidle')
+    lost.wait_for_function('!!window.nagi')
+    lost.locator('#begin').click()
+    lost.wait_for_function('getComputedStyle(document.querySelector("#arrival")).visibility === "hidden" && nagi.audioState==="running"')
+    origin = lost.evaluate('nagi.position')
+    lost.keyboard.down('w')
+    lost.wait_for_function('(p)=>Math.hypot(nagi.position.x-p.x,nagi.position.z-p.z)>.5', arg=origin, timeout=45000)
+    lost.evaluate(lose)
+    lost.wait_for_timeout(300)
+    held = lost.evaluate('nagi.position')
+    steps = lost.evaluate('nagi.footsteps')
+    lost.wait_for_timeout(600)
+    assert lost.evaluate('nagi.position') == held, 'walking continued after the WebGL context was lost'
+    assert lost.evaluate('nagi.footsteps') == steps and lost.evaluate('nagi.speed') == 0
+    assert lost.locator('#error').is_visible() and 'ページを開き直してください' in lost.locator('#error').inner_text()
+    lost.wait_for_function('nagi.audioState==="suspended"')
+    lost.keyboard.up('w')
+    lost.keyboard.down('w')
+    lost.mouse.move(195, 705)
+    lost.mouse.down()
+    lost.mouse.move(195, 620, steps=4)
+    lost.evaluate('_lose.restoreContext()')
+    lost.wait_for_timeout(600)
+    assert lost.evaluate('nagi.position') == held and lost.evaluate('nagi.footsteps') == steps, 'fresh input moved the player without a scene'
+    assert not lost.evaluate('nagi.dragging') and lost.evaluate('nagi.audioState') == 'suspended'
+    assert lost.locator('#error').is_visible()
+    lost.mouse.up()
+    lost.keyboard.up('w')
+    # Before the journey starts, the start button is disabled instead of entering a blank island.
+    lost.reload(wait_until='networkidle')
+    lost.wait_for_function('!!window.nagi && !document.querySelector("#begin").disabled')
+    lost.evaluate(lose)
+    lost.wait_for_function('document.querySelector("#begin").disabled && !document.querySelector("#error").hidden')
+    lost.keyboard.press('Enter')
+    assert not lost.evaluate('nagi.started')
+    assert not errors, errors
+    print('webgl context loss: movement, footsteps and audio stop; reload message shown; start disabled', flush=True)
     browser.close()

@@ -91,6 +91,12 @@ with sync_playwright() as p:
  right=page.evaluate('nagi.position')
  page.mouse.move(870,750);page.wait_for_function(f'nagi.position.yaw < {right["yaw"]-.4}',timeout=30000);page.mouse.up()
  stopped(page)
+ # Releasing the walking button stops at once, even while a right or middle button is still held.
+ for other in ['right','middle']:
+  chord=page.evaluate('nagi.position');page.mouse.move(720,750);page.mouse.down();page.mouse.move(720,690,steps=4);moved(page,chord,.4)
+  page.mouse.down(button=other);page.mouse.up()
+  assert not page.evaluate('nagi.dragging'),other;stopped(page)
+  page.mouse.up(button=other);stopped(page)
  # Check the actual generated PCM rather than only an audio callback counter.
  stats=page.evaluate('window._footBuffers.map(b=>{let peak=0,energy=0;for(const v of b.getChannelData(0)){peak=Math.max(peak,Math.abs(v));energy+=v*v;}return {peak,rms:Math.sqrt(energy/b.length)};})')
  assert len(stats)==6 and all(.01<s['peak']<1 and s['rms']>.005 for s in stats),stats

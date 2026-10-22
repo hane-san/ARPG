@@ -83,6 +83,17 @@ test('mouse button loss clears the owner and mixed keyboard input stays bounded'
  const i=readMovementInput({x:1,y:-1},new Set(['KeyW','KeyE']));assert.equal(i.forward,1);assert.equal(i.turn,1);
  assert.equal(readMovementInput(null,new Set(['KeyW','KeyS'])).forward,0);
 });
+test('releasing the walking mouse button stops the drag while another button stays held',()=>{
+ // Chromium reports a chorded release as pointermove with the remaining buttons, not pointerup.
+ for(const other of [2,4]){
+  const g=new GestureInput(),m={...touch(1),pointerType:'mouse',buttons:1};g.begin(m,bounds);g.move({...m,clientY:657});assert.ok(g.held);
+  g.move({...m,clientY:657,buttons:1|other});assert.ok(g.held,'pressing another button keeps the walk');
+  assert.equal(g.move({...m,clientY:657,buttons:other}),false);assert.equal(g.held,false,`buttons=${other}`);assert.deepEqual(g.value,{x:0,y:0});
+  assert.equal(g.move({...m,clientY:600,buttons:other}),false);assert.deepEqual(g.value,{x:0,y:0});
+ }
+ // Touch and pen keep their existing pointerup/cancel ownership.
+ const pen=new GestureInput(),p={...touch(1),pointerType:'pen',buttons:1};pen.begin(p,bounds);pen.move({...p,clientY:657,buttons:2});assert.ok(pen.held);
+});
 
 test('clear starts never penetrate scene props after a swept slide',()=>{
  const shapes=[boxCollider(0,0,2,3),circleCollider(-4,-3,.3),circleCollider(4,2,.045),boxCollider(-4,4,1,.6)];

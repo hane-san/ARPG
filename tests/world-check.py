@@ -17,17 +17,31 @@ window._qa={
   }}keys.clear();update(1/60);return {steps,position:{...player}};
  },
  view(yaw){player.yaw=yaw;resetCameraHistory();render();},routes,landmarks,
+ surface:(x,z)=>surfaceAt(x,z),
+ // Points just inside both long edges of every drawn road ribbon, halfway along it.
+ roadEdges(){return roadSegments.flatMap(({polygon:[a,b,c,d]})=>{const mx=(a[0]+b[0]+c[0]+d[0])/4,mz=(a[1]+b[1]+c[1]+d[1])/4;
+  return [[(a[0]+b[0])/2,(a[1]+b[1])/2],[(c[0]+d[0])/2,(c[1]+d[1])/2]].map(([ex,ez])=>{const x=mx+(ex-mx)*.97,z=mz+(ez-mz)*.97;return {x,z,surface:surfaceAt(x,z)};});});},
  clearance(){let closest=Infinity;for(const route of routes)for(let i=1;i<route.length;i++){
   const [ax,az]=route[i-1],[bx,bz]=route[i],len=Math.hypot(bx-ax,bz-az);
   for(let t=0;t<=1;t+=.25/len)closest=Math.min(closest,collisionWorld.clearance(ax+(bx-ax)*t,az+(bz-az)*t));
- }return {closest};}
+ }return {closest};},
+ // Culling tests only a batch's centre and radius, so every uploaded vertex must lie inside that circle.
+ batchExtents(){return [...terrainChunks,...roadChunks,...scenery].map(b=>{const v=_uploads.get(b.buffer);let far=0;
+  for(let i=0;i<v.length;i+=9)far=Math.max(far,Math.hypot(v[i]-b.x,v[i+2]-b.z));return {x:b.x,z:b.z,r:b.r,far,count:b.count};});}
 
 };
+'''
+# Keep each uploaded vertex array so the culling radius can be compared with the real geometry.
+upload_probe='''
+window._uploads=new Map();
+const P=WebGLRenderingContext.prototype,bind=P.bindBuffer,upload=P.bufferData;let bound=null;
+P.bindBuffer=function(target,buffer){if(target===this.ARRAY_BUFFER)bound=buffer;return bind.call(this,target,buffer);};
+P.bufferData=function(target,data,usage){if(target===this.ARRAY_BUFFER&&bound&&data instanceof Float32Array)_uploads.set(bound,data);return upload.call(this,target,data,usage);};
 '''
 with sync_playwright() as p:
  browser=p.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH','/usr/bin/chromium'),headless=True,args=['--no-sandbox','--use-angle=swiftshader','--enable-unsafe-swiftshader'])
  page=browser.new_page(viewport={'width':1100,'height':760},device_scale_factor=1)
- errors=[];page.on('pageerror',lambda e:errors.append(str(e)))
+ errors=[];page.on('pageerror',lambda e:errors.append(str(e)));page.add_init_script(upload_probe)
  source=(root/'dist/island.js').read_text()+probe
  page.route('**/island.js?*',lambda route:route.fulfill(status=200,content_type='application/javascript',body=source))
  page.goto('http://127.0.0.1:4174/',wait_until='networkidle');page.wait_for_function('!!window._qa');page.locator('#begin').click()
@@ -36,7 +50,19 @@ with sync_playwright() as p:
  assert page.evaluate('nagi.islanders')==18
  assert page.evaluate('nagi.monuments')==5
  clearance=page.evaluate('_qa.clearance()');assert clearance['closest']>.15,clearance
+ extents=page.evaluate('_qa.batchExtents()');outside=[e for e in extents if e['far']>e['r']]
+ assert len(extents)>100 and not outside,(len(outside),outside[:6])
+ print('culled batches: every vertex lies within its culling radius in',len(extents),'batches',flush=True)
  print('route obstacle clearance:',clearance,'vertices:',page.evaluate('nagi.worldVertices'),flush=True)
+ # Footsteps follow the drawn road, including the 4.2 m half-width expansion roads.
+ edges=page.evaluate('_qa.roadEdges()');off_road=[e for e in edges if e['surface'] not in ('sand','stone')]
+ assert len(edges)>100 and not off_road,(len(off_road),len(edges),off_road[:4])
+ for (ax,az),(bx,bz) in [((-110,-690),(-70,-795)),((220,-650),(315,-525)),((-105,-245),(20,-310)),((0,12),(14,14))]:
+  length=math.hypot(bx-ax,bz-az);nx,nz=-(bz-az)/length,(bx-ax)/length;wide=min(az,bz)<-128
+  for offset,expected in ([(0,'sand'),(2.5,'sand'),(3.5,'sand'),(-4.1,'sand'),(6,'grass'),(-8,'grass')] if wide else [(1.5,'sand'),(2,'grass')]):
+   x,z=(ax+bx)/2+nx*offset,(az+bz)/2+nz*offset;surface=page.evaluate('([x,z])=>_qa.surface(x,z)',[x,z])
+   assert surface==expected,((ax,az),(bx,bz),offset,surface)
+ print('footstep surface matches drawn road width on',len(edges),'ribbon edges',flush=True)
  legs=[('umbrella-grove',[[5,22],[0,12],[-3,1],[-9,-6],[-10,-18],[-10,-27],[-10,-34],[-23,-44],[-36,-57]],-.1),
        ('flower-ridge',[[-36,-70],[-18,-81]],-.7),
        ('headland',[[0,-85],[6,-100]],0),

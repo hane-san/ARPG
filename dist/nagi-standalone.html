@@ -896,7 +896,7 @@ const camera={x:player.x,y:player.y,z:player.z,yaw:player.yaw};
 let previous={...camera},accumulator=0;
 function resetCameraHistory(){Object.assign(camera,{x:player.x,y:player.y,z:player.z,yaw:player.yaw});Object.assign(previous,camera);accumulator=0;}
 
-let started=false,paused=false,muted=false,time=0,last=performance.now(),gestures=new GestureInput(),keys=new Set(),shownPlaces=new Set(),lastGreetingDistance=null;
+let started=false,paused=false,muted=false,contextLost=false,time=0,last=performance.now(),gestures=new GestureInput(),keys=new Set(),shownPlaces=new Set(),lastGreetingDistance=null;
 const notices=new JourneyNotices(),seenScenes=new Set(),sceneDwell=new Map();
 const placeNode=document.querySelector('#place'),greetingNode=document.querySelector('#greeting'),travelBook=document.querySelector('#travel-book');
 let noticeContent=null,paintedNotice=null,previousMovement=false;
@@ -977,6 +977,8 @@ function update(dt){
  paintNotices();
 }
 function frame(now){
+ // Nothing can be drawn after a lost context, so the simulation stops with it.
+ if(contextLost)return;
  const dt=clamp((now-last)/1000,0,1/15);last=now;
  if(started&&!paused){accumulator+=dt;const step=1/60;while(accumulator>=step){previous.x=player.x;previous.y=player.y;previous.z=player.z;previous.yaw=player.yaw;time+=step;update(step);accumulator-=step;}
   const alpha=accumulator/step;for(const k of CAMERA_AXES)camera[k]=previous[k]+(player[k]-previous[k])*alpha;
@@ -992,7 +994,7 @@ function settleInput(){
 }
 function releaseCapture(id){if(id!==null&&canvas.hasPointerCapture(id))canvas.releasePointerCapture(id);}
 canvas.addEventListener('pointerdown',e=>{
- if(!started||paused)return;
+ if(!started||paused||contextLost)return;
  const old=gestures.id,claimed=gestures.begin(e,canvas.getBoundingClientRect());
  if(old!==null&&!gestures.held){stopMovement();releaseCapture(old);}
  if(!claimed)return;
@@ -1011,7 +1013,7 @@ const gameKeys=new Set(['KeyW','KeyA','KeyS','KeyD','KeyQ','KeyE','ArrowUp','Arr
 addEventListener('keydown',e=>{
  if(!started&&e.code==='Enter'){begin();return;}
  if(started&&e.code==='KeyH'&&!e.repeat){e.preventDefault();if(paused)closeBook();else openBook();return;}
- if(paused)return;
+ if(paused||contextLost)return;
  if(started&&gameKeys.has(e.code)&&document.activeElement===canvas){
   e.preventDefault();
   // A physically held key can keep repeating after a dialog or blur cleared it.
@@ -1026,7 +1028,7 @@ function resetInput(){keys.clear();const owner=gestures.reset();stopMovement();r
 addEventListener('blur',resetInput);addEventListener('orientationchange',resetInput);
 canvas.addEventListener('blur',resetInput);
 function suspendAudio(){if(audioCtx&&audioCtx.state!=='closed')audioCtx.suspend().catch(()=>{});}
-function resumeAudio(){if(!paused&&!muted&&!document.hidden&&audioCtx&&audioCtx.state!=='running'&&audioCtx.state!=='closed')audioCtx.resume().catch(()=>{});}
+function resumeAudio(){if(!paused&&!muted&&!contextLost&&!document.hidden&&audioCtx&&audioCtx.state!=='running'&&audioCtx.state!=='closed')audioCtx.resume().catch(()=>{});}
 function openBook(){
  if(!started||paused)return;
  paused=true;resetInput();notices.clear();paintNotices();suspendAudio();document.body.classList.add('reading');travelBook.showModal();
@@ -1115,8 +1117,13 @@ function updateFootsteps(distance,dt){
  if(footDistance>=stride){footDistance%=stride;footstep(surfaceAt(player.x,player.z),speed);}
 }
 function chime(){if(!audioCtx||audioCtx.state!=='running')return;for(const [i,f] of [523.25,783.99].entries()){const o=audioCtx.createOscillator(),g=audioCtx.createGain(),t=audioCtx.currentTime+i*.15;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.035,t+.03);g.gain.exponentialRampToValueAtTime(.0001,t+2);o.connect(g);g.connect(master);o.start(t);o.stop(t+2);}}
-function begin(){if(started)return;started=true;notices.clear();document.body.classList.add('playing');canvas.focus();audio();}
+function begin(){if(started||contextLost)return;started=true;notices.clear();document.body.classList.add('playing');canvas.focus();audio();}
 const beginButton=document.querySelector('#begin');beginButton.addEventListener('click',begin);beginButton.disabled=false;beginButton.removeAttribute('aria-busy');
+// A lost GPU context leaves a blank island: release input, stop footsteps, greetings and sound, and ask for a reload.
+canvas.addEventListener('webglcontextlost',()=>{
+ contextLost=true;resetInput();notices.clear();paintNotices();suspendAudio();document.body.classList.remove('travelling');beginButton.disabled=true;
+ const error=document.querySelector('#error');error.textContent='島を読み込めませんでした。ページを開き直してください。';error.hidden=false;
+});
 // Minimal diagnostic state for development; no interface is added during play.
 window.nagi={get release(){return document.querySelector('meta[name="nagi-release"]')?.content||'local'},get position(){return{x:player.x,z:player.z,yaw:player.yaw}},get camera(){return{...camera}},get turningRate(){return player.yawRate},get continuousRun(){return player.runSeconds},get surge(){return player.surge},get collisionChecks(){return collisionWorld.checks},get actualSpeed(){return player.actualSpeed},get blockedFor(){return player.blockedFor},get monuments(){return monuments.length},get renderedVertices(){return drawnVertices},get drawCalls(){return drawCalls},get started(){return started},get speed(){return Math.hypot(player.vx,player.vz)},get dragging(){return gestures.held},get fov(){return CAMERA_FOV},get greetingDistance(){return lastGreetingDistance},get footsteps(){return footstepCount},get audioState(){return audioCtx?.state||'unavailable'},get footSurface(){return lastFootSurface},get worldVertices(){return terrain.count+roadChunks.reduce((n,b)=>n+b.count,0)+world.count+sea.count+scenery.reduce((n,b)=>n+b.count,0)+movingSails.reduce((n,b)=>n+b.count,0)+birdMesh.count},get places(){return [...shownPlaces]},get islanders(){return npcs.length},get greeted(){return npcs.reduce((a,n)=>a+n.index,0)}};
 

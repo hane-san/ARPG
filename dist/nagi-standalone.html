@@ -501,7 +501,7 @@ function terrainColor(x,z){
 const roadSegments=[];
 for(const points of routes)for(let i=1;i<points.length;i++){
  const [ax,az]=points[i-1],[bx,bz]=points[i],len=Math.hypot(bx-ax,bz-az),w=Math.min(az,bz)<-128?4.2:1.45,nx=-(bz-az)/len*w,nz=(bx-ax)/len*w;
- roadSegments.push({polygon:[[ax+nx,az+nz],[bx+nx,bz+nz],[bx-nx,bz-nz],[ax-nx,az-nz]],minX:Math.min(ax,bx)-w,maxX:Math.max(ax,bx)+w,minZ:Math.min(az,bz)-w,maxZ:Math.max(az,bz)+w});
+ roadSegments.push({polygon:[[ax+nx,az+nz],[bx+nx,bz+nz],[bx-nx,bz-nz],[ax-nx,az-nz]],minX:Math.min(ax,bx)-w,maxX:Math.max(ax,bx)+w,minZ:Math.min(az,bz)-w,maxZ:Math.max(az,bz)+w,ends:[[ax,az],[bx,bz]],w});
 }
 function clipRoad(polygon,triangle){
  let out=polygon;
@@ -626,8 +626,8 @@ function shoreHouse(x,z,w=6){
  // Several overlapping circles follow the footprint without putting invisible walls in the street.
  addBox(x,z,w*.46,w*.36,'house');
 }
-for(const [x,z] of [[-20,-145],[-2,-192],[-109,-224],[-245,-273],[-270,-416],[-223,-489],[-127,-559],[-111,-675],[-69,-777],[9,-815],[217,-632],[302,-510],[279,-391],[166,-291],[64,-222]])if(distanceToRoute(x,z)>3.5)signpost(x,z);
-sceneryBatch(-30,-165,80);
+// Widely spaced signposts each take their own one-metre culling circle; a shared distant centre hid posts in plain view.
+for(const [x,z] of [[-20,-145],[-2,-192],[-109,-224],[-245,-273],[-270,-416],[-223,-489],[-127,-559],[-111,-675],[-69,-777],[9,-815],[217,-632],[302,-510],[279,-391],[166,-291],[64,-222]])if(distanceToRoute(x,z)>3.5){signpost(x,z);sceneryBatch(x,z,1);}
 // Grove clusters leave long stretches open so the sea and monuments remain useful bearings.
 for(const [gx,gz,tint] of [[-90,-200,pal.olive],[-170,-265,pal.olive],[-310,-390,pal.purple],[-185,-470,pal.olive],[-140,-620,pal.olive],[-120,-750,pal.blue],[85,-690,pal.olive],[240,-600,pal.olive],[280,-450,pal.olive],[145,-270,pal.purple]]){
  for(let i=0;i<36;i++){const x=gx+rnd(-42,42),z=gz+rnd(-36,36);if(height(x,z)>2.8&&distanceToRoute(x,z)>9)quietTree(x,z,rnd(1.1,2.4),i%5?tint:pal.pink);}
@@ -678,7 +678,7 @@ for(const m of monuments){const {x,z,size:r,kind}=m,y=height(x,z);
 // The eastern islands: low salt basins, a reed garden, windmills and a sea-facing ruin.
 // All additions use local culled batches; the original landing and skyline stay intact.
 for(const [x,z] of [[382,-462],[501,-496],[646,-443],[815,-419],[1009,-559],[1097,-671],[975,-805],[751,-773],[594,-633],[478,-598]]){
- if(height(x,z)>1&&distanceToRoute(x,z)>7)signpost(x,z);
+ if(height(x,z)>1&&distanceToRoute(x,z)>7){signpost(x,z);sceneryBatch(x,z,1);}
 }
 for(let i=0;i<22;i++){
  const x=376+i*6,z=-482-i*1.05;
@@ -1061,9 +1061,11 @@ for(const event of ['gesturestart','gesturechange','gestureend'])document.addEve
 canvas.addEventListener('touchstart',e=>{if(started)e.preventDefault();},{passive:false});
 canvas.addEventListener('touchmove',e=>{if(started)e.preventDefault();},{passive:false});
 let audioCtx,master,footBuffers={},footDistance=0,feetMoving=false,footSide=0,footstepCount=0,lastFootSurface=null;
+// Footsteps follow each drawn ribbon's own half-width (1.45 m or 4.2 m) plus the original 0.15 m margin.
+const onRoad=(x,z)=>roadSegments.some(r=>distanceToRoute(x,z,[r.ends])<r.w+.15);
 function surfaceAt(x,z){
  if((Math.abs(x+4)<2.35&&Math.abs(z+13)<1.9)||steppingStones.some(([a,b])=>((x-a)/.38)**2+((z-b)/.29)**2<1))return 'stone';
- if(height(x,z)<1.05||distanceToRoute(x,z)<1.6)return 'sand';
+ if(height(x,z)<1.05||onRoad(x,z))return 'sand';
  return 'grass';
 }
 function makeFootBuffer(surface,variant){

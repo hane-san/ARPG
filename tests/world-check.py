@@ -30,6 +30,42 @@ window._qa={
   for(let i=0;i<v.length;i+=9)far=Math.max(far,Math.hypot(v[i]-b.x,v[i+2]-b.z));return {x:b.x,z:b.z,r:b.r,far,count:b.count};});}
 
 };
+
+// Issue #18: push into each large wall-like model and look along it; nothing drawn may sit between the eye and the near plane.
+window._near=(()=>{
+ const NEAR=.18,TAN=Math.tan(68*Math.PI/360),CELL=4,grid=new Map();
+ for(const b of scenery){const v=_uploads.get(b.buffer);if(!v)continue;for(let i=0;i+26<v.length;i+=27){
+  const t=[v[i],v[i+1],v[i+2],v[i+9],v[i+10],v[i+11],v[i+18],v[i+19],v[i+20]];
+  const x0=Math.floor(Math.min(t[0],t[3],t[6])/CELL),x1=Math.floor(Math.max(t[0],t[3],t[6])/CELL),z0=Math.floor(Math.min(t[2],t[5],t[8])/CELL),z1=Math.floor(Math.max(t[2],t[5],t[8])/CELL);
+  if((x1-x0+1)*(z1-z0+1)>400)continue;
+  for(let z=z0;z<=z1;z++)for(let x=x0;x<=x1;x++){const k=x+','+z;let l=grid.get(k);if(!l)grid.set(k,l=[]);l.push(t);}}}
+ const nearby=(x,z,r)=>{const out=new Set();for(let iz=Math.floor((z-r)/CELL);iz<=Math.floor((z+r)/CELL);iz++)for(let ix=Math.floor((x-r)/CELL);ix<=Math.floor((x+r)/CELL);ix++)for(const t of grid.get(ix+','+iz)||[])out.add(t);return [...out];};
+ // Segment p->q against a triangle (Moller-Trumbore).
+ function crosses(p,q,t){
+  const d=[q[0]-p[0],q[1]-p[1],q[2]-p[2]],e1=[t[3]-t[0],t[4]-t[1],t[5]-t[2]],e2=[t[6]-t[0],t[7]-t[1],t[8]-t[2]];
+  const h=[d[1]*e2[2]-d[2]*e2[1],d[2]*e2[0]-d[0]*e2[2],d[0]*e2[1]-d[1]*e2[0]],a=e1[0]*h[0]+e1[1]*h[1]+e1[2]*h[2];if(Math.abs(a)<1e-12)return false;
+  const f=1/a,s=[p[0]-t[0],p[1]-t[1],p[2]-t[2]],u=f*(s[0]*h[0]+s[1]*h[1]+s[2]*h[2]);if(u<0||u>1)return false;
+  const c=[s[1]*e1[2]-s[2]*e1[1],s[2]*e1[0]-s[0]*e1[2],s[0]*e1[1]-s[1]*e1[0]],w=f*(d[0]*c[0]+d[1]*c[1]+d[2]*c[2]);if(w<0||u+w>1)return false;
+  const k=f*(e2[0]*c[0]+e2[1]*c[1]+e2[2]*c[2]);return k>=0&&k<=1;}
+ function clipped(eye,yaw,aspect,tris){const f=[-Math.sin(yaw),-Math.cos(yaw)],r=[Math.cos(yaw),-Math.sin(yaw)],hw=NEAR*TAN*aspect,hh=NEAR*TAN;
+  for(let i=-3;i<=3;i++)for(let j=-2;j<=2;j++){const q=[eye[0]+f[0]*NEAR+r[0]*hw*i/3,eye[1]+hh*j/2,eye[2]+f[1]*NEAR+r[1]*hw*i/3];if(tris.some(t=>crosses(eye,q,t)))return true;}return false;}
+ // The pyramid's leaning struts are excluded: their base circles are a documented follow-up.
+ const wall=o=>['house','quarry','gorge-rock','column','books'].includes(o.kind)||(o.kind==='sculpture'&&Math.abs(o.r-.68)>1e-9);
+ function press(aspects){const failures=[],counts={};let presses=0;
+  collisionWorld.obstacles.forEach(o=>{if(!wall(o))return;counts[o.kind]=(counts[o.kind]||0)+1;
+   const R=o.type==='circle'?o.r*1.6+2:Math.hypot(o.hx,o.hz)*1.3+2,tris=nearby(o.x,o.z,R+2);
+   for(let k=0;k<16;k++){const a=k/16*Math.PI*2,sx=o.x+Math.cos(a)*R,sz=o.z+Math.sin(a)*R;
+    if(!walkable(sx,sz)||collisionWorld.clearance(sx,sz)<.05)continue;
+    player.x=sx;player.z=sz;resetMotion(player);keys.clear();keys.add('KeyW');const eyes=[[sx,height(sx,sz)+1.65,sz]];
+    for(let i=0;i<120;i++){player.yaw=Math.atan2(player.x-o.x,player.z-o.z);player.yawRate=0;update(1/60);eyes.push([player.x,player.y,player.z]);}
+    keys.clear();update(1/60);presses++;const eye=[player.x,player.y,player.z],face=Math.atan2(player.x-o.x,player.z-o.z);
+    const entered=eyes.some((e,i)=>i>0&&tris.some(t=>crosses(eyes[i-1],e,t))),views=[];
+    for(const aspect of aspects)for(let off=-90;off<=90;off+=15)if(clipped(eye,face+off*Math.PI/180,aspect,tris))views.push([+aspect.toFixed(2),off]);
+    if(entered||views.length)failures.push({kind:o.kind,x:o.x,z:o.z,from:k,eye:eye.map(v=>+v.toFixed(2)),entered,views:views.slice(0,4)});
+   }});
+  return {presses,counts,failures};}
+ return {press};
+})();
 '''
 # Keep each uploaded vertex array so the culling radius can be compared with the real geometry.
 upload_probe='''
@@ -93,6 +129,10 @@ with sync_playwright() as p:
   page.evaluate('(yaw)=>_qa.view(yaw)',yaw);page.wait_for_timeout(400)
   page.screenshot(path=str(root/(name+'.png')))
   print(name,json.dumps({'position':result['position'],'drawnVertices':page.evaluate('nagi.renderedVertices'),'drawCalls':page.evaluate('nagi.drawCalls')}),flush=True)
+ # Issue #18: after the loop, press into every house, quarry wall, gorge rock, library shelf/column and upright sculpture pillar.
+ near=page.evaluate('(a)=>_near.press(a)',[390/844,844/390])
+ print('near plane vs walls:',json.dumps({'presses':near['presses'],'models':near['counts'],'failures':len(near['failures'])}),flush=True)
+ assert near['presses']>800 and not near['failures'],near['failures'][:6]
  assert {'風環の丘','凪見の港町','重ね石の渓谷','ひかりの棚田','空洞のピラミッド','岬の天球','白い石切り場','ねじれの庭','薄紫の傘の森','風を待つ段々畑','硝子の入江','空に近い岬','花の尾根道','潮を渡る石道','水鏡の塩田','葦と水路の庭','風車の丘','白灯台の岬','海の図書室','星砂の環'}.issubset(set(page.evaluate('nagi.places')))
  assert not errors,errors
  print('whole expanded island loop + gorge shortcut + cove spur + return: production movement, collisions, destination triggers and rendering passed',flush=True)

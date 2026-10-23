@@ -2,7 +2,7 @@
 const limit=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ease=(a,b,v)=>{const t=limit((v-a)/(b-a),0,1);return t*t*(3-2*t);};
 export const CRUISE_SPEED=14.4,MAX_TRAVEL_SPEED=16.2,PLAYER_RADIUS=.23;
-const SKIN=.0002,EPS=1e-9;
+const SKIN=.0002,EPS=1e-9,CONTACTS=4,SHORE_SLIDE=.35,SHORE_LEAN=.06,SHORE_PROBE=.005;
 // Keep gait cadence comfortable even when the sustained-run speed increases.
 export function footStride(speed){return .72+Math.max(0,speed)*.24;}
 export function travelSpeed(throttle){const t=limit(throttle,-1,1);return t>=0?7.8*t+(CRUISE_SPEED-7.8)*t*t*t:7.2*t;}
@@ -55,6 +55,9 @@ export class GestureInput {
  }
  end(e){this.contacts.delete(e.pointerId);if(!this.contacts.size)this.blocked=false;if(e.pointerId!==this.id)return false;this.clearOwner();return true;}
 }
+// Extra clearance that keeps a camera's whole near rectangle outside a wall it is pressed against, at any yaw.
+// Collider sizes stay object-only; this covers the part of the near plane that reaches further than the player radius.
+export function nearPlaneMargin(near,fov,maxAspect,radius=PLAYER_RADIUS){return Math.max(0,near*Math.hypot(1,Math.tan(fov*Math.PI/360)*maxAspect)-radius);}
 export const circleCollider=(x,z,r,kind='solid')=>({type:'circle',x,z,r,kind});
 export const boxCollider=(x,z,hx,hz,kind='solid')=>({type:'box',x,z,hx,hz,kind});
 function signedDistance(o,x,z){
@@ -118,14 +121,18 @@ export class CollisionWorld {
   for(let i=1;i<=steps;i++)if(!this.walkable(x+dx*i/steps,z+dz*i/steps)){
    let lo=(i-1)/steps,hi=i/steps;
    for(let j=0;j<9;j++){const t=(lo+hi)*.5;if(this.walkable(x+dx*t,z+dz*t))lo=t;else hi=t;}
-   const px=x+dx*lo,pz=z+dz*lo,nx=this.height(px-.15,pz)-this.height(px+.15,pz),nz=this.height(px,pz-.15)-this.height(px,pz+.15),n=Math.hypot(nx,nz);
+   // The contact normal points uphill, back onto dry land; a flat sample falls back to a head-on stop.
+   // Sample within 5 mm so it is the slope of the triangle actually crossed: a wider difference straddles the
+   // terrain's straight triangle edges, blends two facets and can point every slide back into the sea.
+   const px=x+dx*lo,pz=z+dz*lo,nx=this.height(px+SHORE_PROBE,pz)-this.height(px-SHORE_PROBE,pz),nz=this.height(px,pz+SHORE_PROBE)-this.height(px,pz-SHORE_PROBE),n=Math.hypot(nx,nz);
    return n>EPS?{t:lo,nx:nx/n,nz:nz/n,shore:true}:{t:lo,nx:-dx/Math.hypot(dx,dz),nz:-dz/Math.hypot(dx,dz),shore:true};
   }
   return null;
  }
  move(x,z,dx,dz){
   let collided=false;this.checks=0;
-  for(let iteration=0;iteration<4&&dx*dx+dz*dz>EPS*EPS;iteration++){
+  const intent=Math.hypot(dx,dz),ox=intent>EPS?dx/intent:0,oz=intent>EPS?dz/intent:0;
+  for(let iteration=0;iteration<CONTACTS&&dx*dx+dz*dz>EPS*EPS;iteration++){
    let hit=this.shoreHit(x,z,dx,dz);
    for(const id of this.query(x,z,dx,dz)){
     const o=this.obstacles[id];this.checks++;
@@ -140,7 +147,13 @@ export class CollisionWorld {
    x+=dx*advance;z+=dz*advance;
    const remain=1-hit.t;dx*=remain;dz*=remain;
    const dot=dx*hit.nx+dz*hit.nz;if(dot<0){dx-=dot*hit.nx;dz-=dot*hit.nz;}
-   if(hit.shore&&Math.hypot(dx,dz)<length*remain*.55)break;
+   if(hit.shore){
+    // Head-on stop: compare the slide with the original input, so a chain of curved-shore contacts in one step
+    // cannot turn more than about 70 degrees (acos 0.35) away from what the player is pushing.
+    const slide=Math.hypot(dx,dz);if(slide<EPS||(dx*ox+dz*oz)<slide*SHORE_SLIDE)break;
+    // A slight landward lean keeps a convex or faceted shoreline from ending the slide at every vertex.
+    dx+=hit.nx*slide*SHORE_LEAN;dz+=hit.nz*slide*SHORE_LEAN;
+   }
   }
   return {x,z,collided};
  }

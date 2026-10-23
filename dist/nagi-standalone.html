@@ -217,7 +217,7 @@ function walkable(x,z){return height(x,z)>.12;}
 const limit=(v,a,b)=>Math.max(a,Math.min(b,v));
 const ease=(a,b,v)=>{const t=limit((v-a)/(b-a),0,1);return t*t*(3-2*t);};
 const CRUISE_SPEED=14.4,MAX_TRAVEL_SPEED=16.2,PLAYER_RADIUS=.23;
-const SKIN=.0002,EPS=1e-9;
+const SKIN=.0002,EPS=1e-9,CONTACTS=4,SHORE_SLIDE=.35,SHORE_LEAN=.06,SHORE_PROBE=.005;
 // Keep gait cadence comfortable even when the sustained-run speed increases.
 function footStride(speed){return .72+Math.max(0,speed)*.24;}
 function travelSpeed(throttle){const t=limit(throttle,-1,1);return t>=0?7.8*t+(CRUISE_SPEED-7.8)*t*t*t:7.2*t;}
@@ -270,6 +270,9 @@ class GestureInput {
  }
  end(e){this.contacts.delete(e.pointerId);if(!this.contacts.size)this.blocked=false;if(e.pointerId!==this.id)return false;this.clearOwner();return true;}
 }
+// Extra clearance that keeps a camera's whole near rectangle outside a wall it is pressed against, at any yaw.
+// Collider sizes stay object-only; this covers the part of the near plane that reaches further than the player radius.
+function nearPlaneMargin(near,fov,maxAspect,radius=PLAYER_RADIUS){return Math.max(0,near*Math.hypot(1,Math.tan(fov*Math.PI/360)*maxAspect)-radius);}
 const circleCollider=(x,z,r,kind='solid')=>({type:'circle',x,z,r,kind});
 const boxCollider=(x,z,hx,hz,kind='solid')=>({type:'box',x,z,hx,hz,kind});
 function signedDistance(o,x,z){
@@ -333,14 +336,18 @@ class CollisionWorld {
   for(let i=1;i<=steps;i++)if(!this.walkable(x+dx*i/steps,z+dz*i/steps)){
    let lo=(i-1)/steps,hi=i/steps;
    for(let j=0;j<9;j++){const t=(lo+hi)*.5;if(this.walkable(x+dx*t,z+dz*t))lo=t;else hi=t;}
-   const px=x+dx*lo,pz=z+dz*lo,nx=this.height(px-.15,pz)-this.height(px+.15,pz),nz=this.height(px,pz-.15)-this.height(px,pz+.15),n=Math.hypot(nx,nz);
+   // The contact normal points uphill, back onto dry land; a flat sample falls back to a head-on stop.
+   // Sample within 5 mm so it is the slope of the triangle actually crossed: a wider difference straddles the
+   // terrain's straight triangle edges, blends two facets and can point every slide back into the sea.
+   const px=x+dx*lo,pz=z+dz*lo,nx=this.height(px+SHORE_PROBE,pz)-this.height(px-SHORE_PROBE,pz),nz=this.height(px,pz+SHORE_PROBE)-this.height(px,pz-SHORE_PROBE),n=Math.hypot(nx,nz);
    return n>EPS?{t:lo,nx:nx/n,nz:nz/n,shore:true}:{t:lo,nx:-dx/Math.hypot(dx,dz),nz:-dz/Math.hypot(dx,dz),shore:true};
   }
   return null;
  }
  move(x,z,dx,dz){
   let collided=false;this.checks=0;
-  for(let iteration=0;iteration<4&&dx*dx+dz*dz>EPS*EPS;iteration++){
+  const intent=Math.hypot(dx,dz),ox=intent>EPS?dx/intent:0,oz=intent>EPS?dz/intent:0;
+  for(let iteration=0;iteration<CONTACTS&&dx*dx+dz*dz>EPS*EPS;iteration++){
    let hit=this.shoreHit(x,z,dx,dz);
    for(const id of this.query(x,z,dx,dz)){
     const o=this.obstacles[id];this.checks++;
@@ -355,7 +362,13 @@ class CollisionWorld {
    x+=dx*advance;z+=dz*advance;
    const remain=1-hit.t;dx*=remain;dz*=remain;
    const dot=dx*hit.nx+dz*hit.nz;if(dot<0){dx-=dot*hit.nx;dz-=dot*hit.nz;}
-   if(hit.shore&&Math.hypot(dx,dz)<length*remain*.55)break;
+   if(hit.shore){
+    // Head-on stop: compare the slide with the original input, so a chain of curved-shore contacts in one step
+    // cannot turn more than about 70 degrees (acos 0.35) away from what the player is pushing.
+    const slide=Math.hypot(dx,dz);if(slide<EPS||(dx*ox+dz*oz)<slide*SHORE_SLIDE)break;
+    // A slight landward lean keeps a convex or faceted shoreline from ending the slide at every vertex.
+    dx+=hit.nx*slide*SHORE_LEAN;dz+=hit.nz*slide*SHORE_LEAN;
+   }
   }
   return {x,z,collided};
  }
@@ -543,6 +556,9 @@ const terrain={count:terrainChunks.reduce((n,b)=>n+b.count,0)};
 for(let i=0;i<19;i++){const a=i/19*Math.PI*2,r=rnd(1650,2300);sphere(Math.cos(a)*r,-8,Math.sin(a)*r,rnd(90,240),rnd(25,80),rnd(70,180),hex(i%2?'aebfba':'b5c4be'),12,5);}
 const distant=batch();
 const obstacles=[],steppingStones=[];
+// Walls large enough to press a face against use their drawn eye-level footprint plus this margin, so the 0.18 m
+// near plane never enters the model, even looking along a wall in landscape (aspect up to 2.4). About 0.11 m.
+const CAMERA_FOV=68,CAMERA_NEAR=.18,WALL_MARGIN=nearPlaneMargin(CAMERA_NEAR,CAMERA_FOV,2.4);
 const addCircle=(x,z,r,kind='solid')=>obstacles.push(circleCollider(x,z,r,kind));
 const addBox=(x,z,hx,hz,kind='solid')=>obstacles.push(boxCollider(x,z,hx,hz,kind));
 function rock(x,z,s){let y=height(x,z);sphere(x,y+s*.23,z,s,s*.55,s*.72,pal.stone,7,4);if(s>.7&&y>.3)addCircle(x,z,s*.6);}
@@ -623,8 +639,8 @@ function shoreHouse(x,z,w=6){
  quad([x-w*.6,ridge,z],[x+w*.6,ridge,z],[x+w*.6,y+h,z+w*.5],[x-w*.6,y+h,z+w*.5],hex('96a69e'));
  box(x,y+.5,z+w*.405,w*.22,h*.65,.06,pal.bark);
  for(const a of [-.3,.3])box(x+a*w,y+h*.56,z+w*.41,w*.15,h*.25,.08,pal.blue);
- // Several overlapping circles follow the footprint without putting invisible walls in the street.
- addBox(x,z,w*.46,w*.36,'house');
+ // Walls span z -0.4w..0.4w; the door and window frames stand up to 0.41w+0.04 on the front face.
+ addBox(x,z+w*.005+.02,w*.5+WALL_MARGIN,w*.405+.02+WALL_MARGIN,'house');
 }
 // Widely spaced signposts each take their own one-metre culling circle; a shared distant centre hid posts in plain view.
 for(const [x,z] of [[-20,-145],[-2,-192],[-109,-224],[-245,-273],[-270,-416],[-223,-489],[-127,-559],[-111,-675],[-69,-777],[9,-815],[217,-632],[302,-510],[279,-391],[166,-291],[64,-222]])if(distanceToRoute(x,z)>3.5){signpost(x,z);sceneryBatch(x,z,1);}
@@ -639,7 +655,7 @@ for(const [x,z,w] of [[-323,-312,7],[-329,-326,6],[-327,-343,7],[-296,-322,6],[-
 for(let i=0;i<26;i++){const x=-349+i*.8,z=-351,y=height(x,z);box(x,y-.05,z,.75,.16,2.2,pal.stone);}
 lantern(-317,-327);lantern(-300,-345);sceneryBatch(-319,-341,64);
 // Dark, layered rock walls follow a dry, gently graded floor through the gorge.
-for(let i=0;i<18;i++){const z=-296-i*14,centre=.15*(z+400);for(const sign of [-1,1]){const x=centre+sign*rnd(35,48);if(distanceToRoute(x,z)<9)continue;const y=height(x,z),h=rnd(8,18),r=rnd(3,6);for(let j=0;j<3;j++)cone(x,y+j*h/3,z,r*(1-j*.14),r*(.9-j*.14),h/3,hex(j%2?'9da8a0':'b3b6a7'),7);addCircle(x,z,r*.7);}}
+for(let i=0;i<18;i++){const z=-296-i*14,centre=.15*(z+400);for(const sign of [-1,1]){const x=centre+sign*rnd(35,48);if(distanceToRoute(x,z)<9)continue;const y=height(x,z),h=rnd(8,18),r=rnd(3,6);for(let j=0;j<3;j++)cone(x,y+j*h/3,z,r*(1-j*.14),r*(.9-j*.14),h/3,hex(j%2?'9da8a0':'b3b6a7'),7);addCircle(x,z,r+WALL_MARGIN,'gorge-rock');}}
 for(const p of [[23,-326],[-7,-410],[-25,-508]])lantern(...p);
 sceneryBatch(0,-425,180);
 // Terraced rice paddies and olive rows, with generous gaps where the walking path crosses.
@@ -647,14 +663,16 @@ for(let row=0;row<7;row++){const z=-462-row*14;for(let x=-278;x<-168;x+=4){if(di
 for(const x of [-273,-175])for(const z of [-477,-519,-547])if(height(x,z)>3&&distanceToRoute(x,z)>8)quietTree(x,z,1.8);
 shoreHouse(-252,-551,7);sceneryBatch(-224,-511,95);
 // White quarry walls, stepped away from the traversable lane.
-for(let i=0;i<5;i++){const x=352+i*6,z=-515-i*12,y=height(x,z);box(x,y-.3,z,13,7+i*1.6,16,hex(i%2?'c5c7b8':'d6d0bc'));addBox(x,z,5.9,7.3,'quarry');}
+for(let i=0;i<5;i++){const x=352+i*6,z=-515-i*12,y=height(x,z);box(x,y-.3,z,13,7+i*1.6,16,hex(i%2?'c5c7b8':'d6d0bc'));addBox(x,z,6.5+WALL_MARGIN,8+WALL_MARGIN,'quarry');}
 for(const [x,z] of [[300,-548],[293,-530],[328,-493]])rock(x,z,2.5);
 sceneryBatch(345,-541,80);
 // Five monumental, walk-around geometries. Their ground-level openings remain passable.
+// Upright pillar colliders use the hexagonal base radius (the widest part) plus the near-plane margin.
+// The pyramid's leaning struts are not upright, so their base circles are unchanged (see Issue #18 follow-up).
 for(const m of monuments){const {x,z,size:r,kind}=m,y=height(x,z);
  if(kind==='ring'){
   torus(x,y+r+5,z,r,1.1,pal.cream,true);
-  for(const a of [-1,1]){const px=x+a*r*.77;branch([px,height(px,z),z],[px,y+14,z],.65,pal.stone);addCircle(px,z,.52,'sculpture');}
+  for(const a of [-1,1]){const px=x+a*r*.77;branch([px,height(px,z),z],[px,y+14,z],.65,pal.stone);addCircle(px,z,.65+WALL_MARGIN,'sculpture');}
   for(let i=0;i<5;i++){const a=i*Math.PI/2.5;sphere(x+Math.cos(a)*r,y+r+5+Math.sin(a)*r,z,1.35,1.35,1.35,pal.blue,8,5);}
  }else if(kind==='pyramid'){
   const apex=[x,y+46,z],corners=[[-r,-r],[r,-r],[r,r],[-r,r]];
@@ -663,14 +681,14 @@ for(const m of monuments){const {x,z,size:r,kind}=m,y=height(x,z);
   for(let i=0;i<4;i++){const a=i*Math.PI/2,b=(i+1)*Math.PI/2;tri([x,y+26,z],[x+Math.cos(a)*7,y+18,z+Math.sin(a)*7],[x+Math.cos(b)*7,y+18,z+Math.sin(b)*7],i%2?pal.blue:pal.pink);}
  }else if(kind==='sphere'){
   sphere(x,y+34,z,r,r,r,pal.blue,24,14);torus(x,y+34,z,r+1,.45,pal.cream,true);torus(x,y+34,z,r+2,.4,pal.cream);
-  for(const sign of [-1,1]){const px=x+sign*19;branch([px,height(px,z),z],[px,y+34,z],.65,pal.stone);branch([px,y+34,z],[x,y+34,z],.4,pal.cream);addCircle(px,z,.52,'sculpture');}
+  for(const sign of [-1,1]){const px=x+sign*19;branch([px,height(px,z),z],[px,y+34,z],.65,pal.stone);branch([px,y+34,z],[x,y+34,z],.4,pal.cream);addCircle(px,z,.65+WALL_MARGIN,'sculpture');}
  }else if(kind==='cube'){
   box(x,y+17,z,r,r,r,hex('c5b5c9'));
-  for(const a of [-1,1])for(const b of [-1,1]){const px=x+a*(r/2+1),pz=z+b*(r/2+1);branch([px,height(px,pz),pz],[px,y+42,pz],.45,pal.stone);addCircle(px,pz,.36,'sculpture');}
+  for(const a of [-1,1])for(const b of [-1,1]){const px=x+a*(r/2+1),pz=z+b*(r/2+1);branch([px,height(px,pz),pz],[px,y+42,pz],.45,pal.stone);addCircle(px,pz,.45+WALL_MARGIN,'sculpture');}
   for(const level of [y+16,y+41]){box(x,level,z-r/2-1,r+3,.5,.5,pal.cream);box(x,level,z+r/2+1,r+3,.5,.5,pal.cream);box(x-r/2-1,level,z,.5,.5,r+3,pal.cream);box(x+r/2+1,level,z,.5,.5,r+3,pal.cream);}
  }else if(kind==='spiral'){
   for(const phase of [0,Math.PI]){let last=null;for(let i=0;i<=64;i++){const t=i/64,a=t*Math.PI*3+phase,p=[x+Math.cos(a)*12,y+6+t*34,z+Math.sin(a)*12];if(last)branch(last,p,.8,phase?pal.pink:pal.blue);last=p;}}
-  for(const sign of [-1,1]){const px=x+sign*17;branch([px,height(px,z),z],[px,y+40,z],.4,pal.cream);addCircle(px,z,.32,'sculpture');}
+  for(const sign of [-1,1]){const px=x+sign*17;branch([px,height(px,z),z],[px,y+40,z],.4,pal.cream);addCircle(px,z,.4+WALL_MARGIN,'sculpture');}
  }
  sceneryBatch(x,z,Math.max(70,r*2));
 }
@@ -737,12 +755,12 @@ sceneryBatch(1123,-646,90);
 // Roofless reading room: the path passes between columns and rows of pale stone books.
 for(const dx of [-16,16])for(const dz of [-23,-8,8,23]){
  const x=1075+dx,z=-755+dz,y=height(x,z),h=dz===23?6:11;
- cone(x,y,z,1.2,1,h,pal.cream,8);box(x,y+h,z,3,.7,3,pal.stone);addCircle(x,z,.95,'column');
+ cone(x,y,z,1.2,1,h,pal.cream,8);box(x,y+h,z,3,.7,3,pal.stone);addCircle(x,z,1.2+WALL_MARGIN,'column');
  if(dz<8)branch([x,y+h+.6,z],[x,height(x,z+15)+11.6,z+15],.65,pal.stone);
 }
 for(const dx of [-25,25])for(let i=0;i<9;i++){
  const x=1075+dx,z=-779+i*6,y=height(x,z);
- box(x,y,z,1.4,2.8+(i%3)*.5,2.5,[pal.blue,pal.cream,pal.pink][i%3]);addBox(x,z,.57,1.05,'books');
+ box(x,y,z,1.4,2.8+(i%3)*.5,2.5,[pal.blue,pal.cream,pal.pink][i%3]);addBox(x,z,.7+WALL_MARGIN,1.25+WALL_MARGIN,'books');
 }
 lantern(1062,-738);sceneryBatch(1075,-755,80);
 // Open shell circle and small pink groves on the returning shore.
@@ -889,7 +907,7 @@ for(let i=0;i<5;i++){
 }
 const birdMesh=batch();
 for(const [x,z,y] of [[-66,14,30],[-345,-330,65],[1105,-680,85]])seabirds.push({x,z,y,r:65,offset:new Float32Array(3)});
-const CAMERA_FOV=68,RUN_SPEED=CRUISE_SPEED,GREETING_RADIUS=4.8;
+const RUN_SPEED=CRUISE_SPEED,GREETING_RADIUS=4.8;
 const collisionWorld=new CollisionWorld(obstacles,{height,walkable});
 const player=createMotionState(8,30,.25);player.y=height(8,30)+1.65;
 const camera={x:player.x,y:player.y,z:player.z,yaw:player.yaw};
@@ -901,7 +919,7 @@ const notices=new JourneyNotices(),seenScenes=new Set(),sceneDwell=new Map();
 const placeNode=document.querySelector('#place'),greetingNode=document.querySelector('#greeting'),travelBook=document.querySelector('#travel-book');
 let noticeContent=null,paintedNotice=null,previousMovement=false;
 function resize(){const d=Math.min(devicePixelRatio||1,1.5),w=Math.round(innerWidth*d),h=Math.round(innerHeight*d);if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;gl.viewport(0,0,w,h);}}addEventListener('resize',resize);resize();
-function vp(){const f=1/Math.tan(CAMERA_FOV*Math.PI/360),aspect=canvas.width/canvas.height,n=.18,far=2600,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*camera.x+s*camera.z,-camera.y,-s*camera.x-c*camera.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
+function vp(){const f=1/Math.tan(CAMERA_FOV*Math.PI/360),aspect=canvas.width/canvas.height,n=CAMERA_NEAR,far=2600,proj=[f/aspect,0,0,0,0,f,0,0,0,0,(far+n)/(n-far),-1,0,0,2*far*n/(n-far),0];const c=Math.cos(camera.yaw),s=Math.sin(camera.yaw),view=[c,0,s,0,0,1,0,0,-s,0,c,0,-c*camera.x+s*camera.z,-camera.y,-s*camera.x-c*camera.z,1],out=new Float32Array(16);for(let j=0;j<4;j++)for(let i=0;i<4;i++){let v=0;for(let k=0;k<4;k++)v+=proj[k*4+i]*view[j*4+k];out[j*4+i]=v;}return out;}
 const DRAW_ORIGIN=[0,0,0],WORLD_SCENERY_BOUNDS={x:0,z:-25,r:100},CAMERA_AXES=['x','y','z','yaw'];
 let drawnVertices=0,drawCalls=0,viewCos=1,viewSin=0,viewTangent=1,viewPadding=1;
 function draw(b,offset=DRAW_ORIGIN,yaw=0,water=0,roll=0){gl.bindBuffer(gl.ARRAY_BUFFER,b.buffer);for(let i=0;i<3;i++){gl.enableVertexAttribArray(attrs[i]);gl.vertexAttribPointer(attrs[i],3,gl.FLOAT,false,36,i*12);}gl.uniform3fv(loc.uOffset,offset);gl.uniform1f(loc.uYaw,yaw);gl.uniform1f(loc.uRoll,roll);gl.uniform1f(loc.uWater,water);gl.drawArrays(gl.TRIANGLES,0,b.count);drawnVertices+=b.count;drawCalls++;}
